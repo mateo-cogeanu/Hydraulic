@@ -26,14 +26,8 @@ public class SiftVisuals extends PackModule<SiftVisuals> {
                 if (image == null) image = context.mod().resolveFile("assets/the_sift/textures/block/sift_portal_mist.png");
                 pack.addExtraFile(Files.readAllBytes(image), "textures/hydraulic/the_sift/portal.png");
                 pack.addBlockTexture("hydraulic_sift_portal", "textures/hydraulic/the_sift/portal");
-                pack.addExtraFile(JsonParser.parseString("""
-                        {"format_version":"1.16.0","minecraft:geometry":[{
-                          "description":{"identifier":"geometry.hydraulic.sift_portal","texture_width":16,"texture_height":16},
-                          "bones":[{"name":"portal","pivot":[0,8,0],"cubes":[{
-                            "origin":[-8,0,-0.05],"size":[16,16,0.1],"uv":{
-                              "north":{"uv":[0,0],"uv_size":[16,16]},
-                              "south":{"uv":[0,0],"uv_size":[16,16]}}}]}]}]}
-                        """), "models/blocks/hydraulic_sift_portal.geo.json");
+                pack.addExtraFile(org.geysermc.hydraulic.block.StructureGeometry.create("geometry.hydraulic.sift_portal", "frame"), "models/blocks/hydraulic_sift_portal.geo.json");
+                pack.addExtraFile(org.geysermc.hydraulic.block.StructureGeometry.culling(), "block_culling/hydraulic_solid_cube.json");
                 for (String identifier : NativePacketBridge.PARTICLES) {
                     String name = identifier.split(":")[1];
                     var source = context.mod().resolveFile("assets/the_sift/particles/" + name + ".json");

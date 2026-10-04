@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Convert mod registry entries before MCProtocolLib decodes its vanilla-only enums. */
 public final class NativePacketBridge {
+    public static final Map<UUID, ParticleBudget> PARTICLE_BUDGETS = new ConcurrentHashMap<>();
     public static final Set<String> PARTICLES = ConcurrentHashMap.newKeySet();
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -66,7 +67,10 @@ public final class NativePacketBridge {
             String identifier = BuiltInRegistries.PARTICLE_TYPE.getKey(particles.particle().getType()).toString();
             if (!identifier.startsWith("minecraft:")) {
                 if (PARTICLES.contains(identifier)) {
-                    int count = particles.count() == 0 ? 1 : Math.min(256, particles.count());
+                    double dx = particles.x() - player.getX(), dy = particles.y() - player.getY(), dz = particles.z() - player.getZ();
+                    if (dx * dx + dy * dy + dz * dz > 24 * 24) return null;
+                    int count = PARTICLE_BUDGETS.computeIfAbsent(owner, ignored -> new ParticleBudget())
+                            .reserve(particles.count() == 0 ? 1 : particles.count(), System.nanoTime());
                     var random = java.util.concurrent.ThreadLocalRandom.current();
                     for (int i = 0; i < count; i++) {
                         var position = Vector3f.from(particles.x() + random.nextGaussian() * particles.xDist(),
@@ -83,7 +87,7 @@ public final class NativePacketBridge {
                 String mode = below.getProperties().stream().filter(property -> property.getName().equals("mode"))
                         .map(property -> below.getValue(property).toString().toLowerCase(Locale.ROOT)).findFirst().orElse("");
                 if (mode.equals("note") || mode.equals("horn")) {
-                    if (mode.equals("note")) particle(session, "the_sift:sift_note", Vector3f.from(event.getPos().getX() + 0.5, event.getPos().getY() + 1.2, event.getPos().getZ() + 0.5));
+                    if (mode.equals("note") && PARTICLE_BUDGETS.computeIfAbsent(owner, ignored -> new ParticleBudget()).reserve(1, System.nanoTime()) > 0) particle(session, "the_sift:sift_note", Vector3f.from(event.getPos().getX() + 0.5, event.getPos().getY() + 1.2, event.getPos().getZ() + 0.5));
                     // Sift's server sends the actual custom sound separately. Avoid Bedrock's
                     // automatic vanilla instrument sound for this same block event.
                     return null;
@@ -94,7 +98,9 @@ public final class NativePacketBridge {
     }
 
     private static void particle(GeyserSession session, String identifier, Vector3f position) {
+        if (session.isClosed()) return;
         session.executeInEventLoop(() -> {
+            if (session.isClosed()) return;
             SpawnParticleEffectPacket effect = new SpawnParticleEffectPacket();
             effect.setIdentifier(identifier);
             effect.setDimensionId(DimensionUtils.javaToBedrock(session));

@@ -412,7 +412,7 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                             .anyMatch(property -> property.getName().equals("axis") && propertyValue(state, property).equals("z")) ? 90 : 0;
                     componentsBuilder.transformation(new TransformationComponent(0, rotation, 0, 1, 1, 1, 0, 0, 0));
                     componentsBuilder.materialInstance("*", MaterialInstance.builder().texture("hydraulic_sift_portal")
-                            .renderMethod("alpha_test").faceDimming(false).ambientOcclusion(false).build());
+                            .renderMethod("opaque").faceDimming(false).ambientOcclusion(false).build());
                 }
 
                 // No properties exist on this state, so there's only one

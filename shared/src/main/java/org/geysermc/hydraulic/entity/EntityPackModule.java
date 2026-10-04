@@ -85,7 +85,10 @@ public class EntityPackModule extends PackModule<EntityPackModule> {
     @org.geysermc.event.subscribe.Subscribe
     public void onDisconnect(SessionDisconnectEvent event) {
         UUID uuid = event.connection().javaUuid();
-        if (uuid != null) TRACKED.remove(uuid);
+        if (uuid != null) {
+            TRACKED.remove(uuid);
+            org.geysermc.hydraulic.compat.NativePacketBridge.PARTICLE_BUDGETS.remove(uuid);
+        }
     }
 
     private void postProcess(PackPostProcessContext<EntityPackModule> context) {

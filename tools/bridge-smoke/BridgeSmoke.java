@@ -114,6 +114,24 @@ public class BridgeSmoke implements ModInitializer {
                         frameBlocks++;
                     }
                 }
+                var convert = org.geysermc.geyser.registry.populator.CustomBlockRegistryPopulator.class.getDeclaredMethod("convertComponents", org.geysermc.geyser.api.block.custom.component.CustomBlockComponents.class);
+                convert.setAccessible(true);
+                int culled = 0;
+                for (var block : org.geysermc.geyser.registry.BlockRegistries.CUSTOM_BLOCKS.get()) {
+                    java.util.List<org.geysermc.geyser.api.block.custom.component.CustomBlockComponents> all = new java.util.ArrayList<>();
+                    all.add(block.components());
+                    for (var permutation : block.permutations()) all.add(permutation.components());
+                    for (var components : all) {
+                        if (components == null || components.geometry() == null) continue;
+                        String id = components.geometry().identifier();
+                        if (!id.equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER) && !id.equals("geometry.hydraulic.sift_portal")) continue;
+                        var nbt = (org.cloudburstmc.nbt.NbtMap) convert.invoke(null, components);
+                        if (!nbt.getCompound("minecraft:geometry").getString("culling").equals(org.geysermc.hydraulic.block.StructureGeometry.CULLING)) throw new AssertionError("Culling missing for " + block.identifier());
+                        culled++;
+                    }
+                }
+                if (culled < 5) throw new AssertionError("Culling not applied: " + culled);
+                System.out.println("HYDRAULIC CULLING SMOKE PASS: " + culled + " cube components have culling rules.");
                 if (frameBlocks != 4) throw new AssertionError("Missing portal frame mappings: " + frameBlocks);
                 String key = "advancement.the_sift.story.brave_the_unknown.title";
                 String translation = org.geysermc.geyser.text.MinecraftLocale.getLocaleStringIfPresent(key, "en_us");

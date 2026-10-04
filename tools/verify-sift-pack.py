@@ -64,6 +64,17 @@ with ZipFile(sys.argv[1]) as pack:
         assert description['geometry']['default'] in geometries, f'Missing armor geometry: {name}'
     assert 'geometry.hydraulic.sift_portal' in geometries
     assert 'geometry.hydraulic.structure_cube' in geometries
+    portal = geometries['geometry.hydraulic.sift_portal']['bones'][0]
+    assert portal['name'] == 'frame'
+    assert portal['cubes'][0]['origin'] == [-8, 0, -8]
+    assert portal['cubes'][0]['size'] == [16, 16, 16]
+    assert len(portal['cubes'][0]['uv']) == 6
+    culling = json.loads(pack.read('block_culling/hydraulic_solid_cube.json'))['minecraft:block_culling_rules']
+    assert culling['description']['identifier'] == 'hydraulic:solid_cube'
+    assert len(culling['rules']) == 6
+    for rule in culling['rules']:
+        assert rule['geometry_part']['bone'] == 'frame'
+        assert rule['geometry_part']['face'] == rule['direction']
     manifest = json.loads(pack.read('manifest.json'))
     assert manifest['header']['min_engine_version'] >= [1, 26, 0]
     terrain = json.loads(pack.read('textures/terrain_texture.json'))['texture_data']
