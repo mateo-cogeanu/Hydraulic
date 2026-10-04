@@ -160,6 +160,9 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
     private void postProcess(@NotNull PackPostProcessContext<BlockPackModule> context) {
         ResourcePack assets = context.javaResourcePack();
         BedrockResourcePack bedrockPack = context.bedrockResourcePack();
+        if (context.mod().namespace().equals("the_sift")) {
+            bedrockPack.addExtraFile(StructureGeometry.create(), "models/blocks/hydraulic_structure_cube.geo.json");
+        }
 
         // Each matching multipart selector contributes a separately rotated part.
         // Export a complete geometry instead of dropping every part after the first match.
@@ -398,13 +401,18 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                     context.logger().warn("Could not find material for block {}", key);
                 }
 
+                if (StructureGeometry.isSiftFrame(blockLocation.toString())) {
+                    componentsBuilder.geometry(GeometryComponent.builder().identifier(StructureGeometry.IDENTIFIER).build());
+                }
+
                 if (blockLocation.toString().equals("the_sift:sift_portal")) {
                     componentsBuilder.geometry(GeometryComponent.builder().identifier("geometry.hydraulic.sift_portal").build());
+                    componentsBuilder.lightEmission(state.getLightEmission()).lightDampening(0);
                     int rotation = state.getProperties().stream()
                             .anyMatch(property -> property.getName().equals("axis") && propertyValue(state, property).equals("z")) ? 90 : 0;
                     componentsBuilder.transformation(new TransformationComponent(0, rotation, 0, 1, 1, 1, 0, 0, 0));
                     componentsBuilder.materialInstance("*", MaterialInstance.builder().texture("hydraulic_sift_portal")
-                            .renderMethod("blend").faceDimming(false).ambientOcclusion(false).build());
+                            .renderMethod("alpha_test").faceDimming(false).ambientOcclusion(false).build());
                 }
 
                 // No properties exist on this state, so there's only one

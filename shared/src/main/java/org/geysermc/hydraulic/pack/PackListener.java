@@ -148,7 +148,7 @@ public class PackListener {
             return true;
         }
 
-        String modUUID = PackUtil.getModUUID(mod.roots()).toString();
+        String modUUID = manager.packIdentity(mod).toString();
 
         return !modUUID.equals(packUUID);
     }

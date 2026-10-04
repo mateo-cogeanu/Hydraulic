@@ -77,6 +77,14 @@ public class PackManager {
     private final ListMultimap<String, Identifier> modsToBlocks = MultimapBuilder.hashKeys().arrayListValues().build();
     private final ListMultimap<String, Identifier> modsToItems = MultimapBuilder.hashKeys().arrayListValues().build();
 
+    private java.util.UUID converterIdentity;
+    private final Map<ModInfo, java.util.UUID> packIdentities = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public java.util.UUID packIdentity(ModInfo mod) {
+        return packIdentities.computeIfAbsent(mod, input -> PackIdentity.of(
+                org.geysermc.hydraulic.util.PackUtil.getModUUID(input.roots()), converterIdentity));
+    }
+
     private List<ConverterPipeline<?, ?>> packConverters;
     private ModelStitcher.Provider modelProvider;
 
@@ -89,6 +97,7 @@ public class PackManager {
      * Initializes the pack manager.
      */
     public void initialize() {
+        converterIdentity = org.geysermc.hydraulic.util.PackUtil.getModUUID(hydraulic.mod(Constants.MOD_ID).roots());
         initializeModLookups();
 
         final Collection<ModInfo> mods = this.hydraulic.mods();
@@ -166,7 +175,7 @@ public class PackManager {
     @SuppressWarnings({ "rawtypes", "unchecked" })
     boolean createPack(@NotNull ModInfo mod, @NotNull Path packPath) {
         List<ConverterPipeline<?, ?>> pipelines = new ArrayList<>(packConverters);
-        pipelines.add(AssetConverters.create(new MetadataPackModule(mod)));
+        pipelines.add(AssetConverters.create(new MetadataPackModule(mod, packIdentity(mod))));
 
         PackConverter converter = new PackConverter()
                 .packName(mod.name())

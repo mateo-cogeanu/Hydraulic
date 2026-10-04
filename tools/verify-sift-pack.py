@@ -23,7 +23,8 @@ with ZipFile(sys.argv[1]) as pack:
     assert len(attachables) == 4, f'Expected 4 armor attachables, found {len(attachables)}'
     for name in attachables:
         description = json.loads(pack.read(name))['minecraft:attachable']['description']
-        assert description['identifier'] in description['item'], name
+        binding = description.get('item', description['identifier'])
+        assert description['identifier'] in binding, name
         assert description['textures']['default'] + '.png' in names, name
 
     multipart = [name for name in names if 'hydraulic_multipart_' in name and name.endswith('.json')]
@@ -62,6 +63,9 @@ with ZipFile(sys.argv[1]) as pack:
         description = json.loads(pack.read(name))['minecraft:attachable']['description']
         assert description['geometry']['default'] in geometries, f'Missing armor geometry: {name}'
     assert 'geometry.hydraulic.sift_portal' in geometries
+    assert 'geometry.hydraulic.structure_cube' in geometries
+    manifest = json.loads(pack.read('manifest.json'))
+    assert manifest['header']['min_engine_version'] >= [1, 26, 0]
     terrain = json.loads(pack.read('textures/terrain_texture.json'))['texture_data']
     assert 'hydraulic_sift_portal' in terrain
     assert 'textures/hydraulic/the_sift/portal.png' in names

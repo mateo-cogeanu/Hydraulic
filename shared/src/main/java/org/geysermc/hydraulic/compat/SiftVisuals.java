@@ -32,7 +32,7 @@ public class SiftVisuals extends PackModule<SiftVisuals> {
                           "bones":[{"name":"portal","pivot":[0,8,0],"cubes":[{
                             "origin":[-8,0,-0.05],"size":[16,16,0.1],"uv":{
                               "north":{"uv":[0,0],"uv_size":[16,16]},
-                              "south":{"uv":[16,0],"uv_size":[-16,16]}}}]}]}]}
+                              "south":{"uv":[0,0],"uv_size":[16,16]}}}]}]}]}
                         """), "models/blocks/hydraulic_sift_portal.geo.json");
                 for (String identifier : NativePacketBridge.PARTICLES) {
                     String name = identifier.split(":")[1];

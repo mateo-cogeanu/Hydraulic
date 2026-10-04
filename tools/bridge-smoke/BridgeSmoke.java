@@ -26,7 +26,8 @@ public class BridgeSmoke implements ModInitializer {
             if (!done.compareAndSet(false, true)) return;
             try {
                 var player = new ServerPlayer(server, server.overworld(), new GameProfile(UUID.randomUUID(), "HydraulicProbe"), ClientInformation.createDefault());
-                int entities = 0, sounds = 0;
+                int entities = 0, appearances = 0, sounds = 0;
+                Class.forName("net.minecraft.server.network.ServerCommonPacketListenerImpl");
                 for (var entry : EntityPackModule.PROFILES.entrySet()) {
                     int id = 1234 + entities;
                     var packet = new ClientboundAddEntityPacket(id, UUID.randomUUID(), 1, 2, 3, 0, 0, entry.getKey(), 0, Vec3.ZERO, 0);
@@ -38,6 +39,25 @@ public class BridgeSmoke implements ModInitializer {
                         if (decoded.getEntityId() != id || !decoded.getUuid().equals(packet.getUUID())) throw new AssertionError("Entity identity changed");
                         if (!decoded.getType().name().equals(BuiltInRegistries.ENTITY_TYPE.getKey(entry.getValue().proxy()).getPath().toUpperCase(Locale.ROOT))) throw new AssertionError("Wrong proxy type");
                     } finally { buffer.release(); }
+                    if (entry.getValue().proxy() != net.minecraft.world.entity.EntityTypes.SNOWBALL) {
+                        var connection = (org.geysermc.geyser.api.connection.GeyserConnection) java.lang.reflect.Proxy.newProxyInstance(
+                                getClass().getClassLoader(), new Class<?>[]{org.geysermc.geyser.api.connection.GeyserConnection.class},
+                                (proxy, method, arguments) -> method.getName().equals("javaUuid") ? player.getUUID() : null);
+                        var selected = new java.util.concurrent.atomic.AtomicReference<org.geysermc.geyser.api.entity.definition.GeyserEntityDefinition>();
+                        var spawn = new org.geysermc.geyser.api.event.java.ServerSpawnEntityEvent(connection) {
+                            public int entityId() { return id; }
+                            public UUID uuid() { return packet.getUUID(); }
+                            public org.geysermc.geyser.api.entity.definition.JavaEntityType entityType() { return null; }
+                            public org.geysermc.geyser.api.entity.definition.GeyserEntityDefinition definition() { return selected.get(); }
+                            public void definition(org.geysermc.geyser.api.entity.definition.GeyserEntityDefinition value) { selected.set(value); }
+                            public void preSpawnConsumer(java.util.function.Consumer<org.geysermc.geyser.api.entity.type.GeyserEntity> callback) {}
+                            public boolean isCancelled() { return false; }
+                            public void setCancelled(boolean value) {}
+                        };
+                        org.geysermc.geyser.GeyserImpl.getInstance().eventBus().fire(spawn);
+                        if (selected.get() == null || !selected.get().identifier().toString().equals(entry.getValue().identifier())) throw new AssertionError("Custom appearance not selected: " + entry.getValue().identifier());
+                        appearances++;
+                    }
                     var values = List.<SynchedEntityData.DataValue<?>>of(new SynchedEntityData.DataValue<>(0, EntityDataSerializers.BYTE, (byte)0), new SynchedEntityData.DataValue<>(30, EntityDataSerializers.INT, 99));
                     var metadata = (ClientboundSetEntityDataPacket) NativePacketBridge.remap(new ClientboundSetEntityDataPacket(id, values), player, null);
                     if (entry.getValue().metadataLimit() != Integer.MAX_VALUE && metadata.packedItems().size() != 1) throw new AssertionError("Custom metadata leaked");
@@ -55,13 +75,50 @@ public class BridgeSmoke implements ModInitializer {
                         sounds++;
                     } finally { buffer.release(); }
                 }
+                // Always-ticking test actor is visible in an empty test world without
+                // adding a real player or depending on asynchronously promoted chunks.
+                var blub = new net.minecraft.world.entity.animal.cow.Cow(net.minecraft.world.entity.EntityTypes.COW, server.overworld()) {
+                    @Override public boolean isAlwaysTicking() { return true; }
+                };
+                blub.setPos(2, 80, 2);
+                if (!server.overworld().addFreshEntity(blub)) throw new AssertionError("Could not add test sound actor");
+                if (server.overworld().getEntity(blub.getId()) == null) throw new AssertionError("Test sound actor not tracked");
+                var blubSound = BuiltInRegistries.SOUND_EVENT.get(net.minecraft.resources.Identifier.parse("the_sift:entity.blub.idle_water")).orElseThrow().value();
+                var entitySound = new ClientboundSoundEntityPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(blubSound), SoundSource.NEUTRAL, blub, 1, 1, 42);
+                var positionalSound = (ClientboundSoundPacket) NativePacketBridge.remap(entitySound, player, null);
+                if (!positionalSound.getSound().value().location().equals(blubSound.location()) || positionalSound.getY() != 80) throw new AssertionError("Entity sound bridge lost identifier or position");
+                blub.discard();
+                for (var itemPalette : org.geysermc.geyser.registry.Registries.ITEMS.get().values()) {
+                    for (String piece : List.of("helmet", "chestplate", "leggings", "boots")) {
+                        String identifier = "the_sift:siftite_" + piece;
+                        boolean found = false;
+                        for (Object definition : itemPalette.getItemDefinitions().values()) {
+                            if (definition.getClass().getMethod("getIdentifier").invoke(definition).equals(identifier)) found = true;
+                        }
+                        if (!found) throw new AssertionError("Missing Bedrock armor item definition " + identifier);
+                    }
+                }
                 NativePacketBridge.remap(new ClientboundRemoveEntitiesPacket(EntityPackModule.TRACKED.get(player.getUUID()).keySet().stream().mapToInt(Integer::intValue).toArray()), player, null);
                 if (!EntityPackModule.TRACKED.get(player.getUUID()).isEmpty()) throw new AssertionError("Entity tracking leak");
                 EntityPackModule.TRACKED.remove(player.getUUID());
+                int frameBlocks = 0;
+                for (var block : org.geysermc.geyser.registry.BlockRegistries.CUSTOM_BLOCKS.get()) {
+                    if (org.geysermc.hydraulic.block.StructureGeometry.isSiftFrame(block.identifier())) {
+                        var components = block.components();
+                        var geometry = components.geometry();
+                        if (geometry == null || !geometry.identifier().equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER)) {
+                            boolean permutationMatch = block.permutations().stream().anyMatch(permutation ->
+                                    permutation.components().geometry() != null && permutation.components().geometry().identifier().equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER));
+                            if (!permutationMatch) throw new AssertionError("Frame geometry not assigned to " + block.identifier());
+                        }
+                        frameBlocks++;
+                    }
+                }
+                if (frameBlocks != 4) throw new AssertionError("Missing portal frame mappings: " + frameBlocks);
                 String key = "advancement.the_sift.story.brave_the_unknown.title";
                 String translation = org.geysermc.geyser.text.MinecraftLocale.getLocaleStringIfPresent(key, "en_us");
                 if (!"Brave the Unknown".equals(translation)) throw new AssertionError("Advancement title not translated: " + translation);
-                System.out.println("HYDRAULIC BRIDGE SMOKE PASS: " + entities + " entity spawn/metadata wire round trips; " + sounds + " custom sound wire round trips; tracking cleanup and Geyser advancement translation passed.");
+                System.out.println("HYDRAULIC BRIDGE SMOKE PASS: " + entities + " entity spawn/metadata wire round trips; " + sounds + " custom sound wire round trips; " + appearances + " event-bus appearance selections; entity audio, armor identifiers, frame components, tracking cleanup and Geyser advancement translation passed.");
             } catch (Throwable e) {
                 System.err.println("HYDRAULIC BRIDGE SMOKE FAILED");
                 e.printStackTrace();

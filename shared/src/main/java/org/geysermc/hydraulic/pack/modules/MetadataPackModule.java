@@ -26,9 +26,11 @@ import java.util.UUID;
 
 public class MetadataPackModule implements AssetExtractor<ModInfo>, AssetConverter<ModInfo, Manifest>, AssetCombiner<Manifest> {
     private final ModInfo modInfo;
+    private final UUID packIdentity;
 
-    public MetadataPackModule(ModInfo modInfo) {
+    public MetadataPackModule(ModInfo modInfo, UUID packIdentity) {
         this.modInfo = modInfo;
+        this.packIdentity = packIdentity;
     }
 
     @Override
@@ -45,8 +47,11 @@ public class MetadataPackModule implements AssetExtractor<ModInfo>, AssetConvert
 
         Header header = manifest.header();
 
-        // Generate the pack uuid from the mod file
-        String packUuid = PackUtil.getModUUID(mod.roots()).toString();
+        // Both the mod resources and converter build contribute to the Bedrock cache identity.
+        String packUuid = packIdentity.toString();
+        // Generated assets use current custom geometry/entity features. The old 1.16
+        // resource-pack engine version can select legacy built-in rendering definitions.
+        header.minEngineVersion(new float[] {1, 26, 0});
         header.uuid(packUuid);
 
         // Generate module uuid based on type

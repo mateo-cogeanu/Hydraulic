@@ -11,9 +11,7 @@ import org.cloudburstmc.math.vector.Vector3f;
 import org.cloudburstmc.protocol.bedrock.packet.SpawnParticleEffectPacket;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.util.DimensionUtils;
-import org.geysermc.geyser.util.SoundUtils;
 import org.geysermc.hydraulic.entity.EntityPackModule;
-import org.geysermc.mcprotocollib.protocol.data.game.level.sound.CustomSound;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -57,8 +55,10 @@ public final class NativePacketBridge {
         if (packet instanceof ClientboundSoundEntityPacket sound && !sound.getSound().value().location().getNamespace().equals("minecraft")) {
             var entity = player.level().getEntity(sound.getId());
             if (entity != null) {
-                var position = Vector3f.from(entity.getX(), entity.getY(), entity.getZ());
-                session.executeInEventLoop(() -> SoundUtils.playSound(session, new CustomSound(sound.getSound().value().location().toString(), false, 0), position, sound.getVolume(), sound.getPitch()));
+                // Use the normal Java sound translator with an inline identifier. This
+                // avoids a separate upstream send path and works for custom/aliased audio.
+                return new ClientboundSoundPacket(Holder.direct(sound.getSound().value()), sound.getSource(),
+                        entity.getX(), entity.getY(), entity.getZ(), sound.getVolume(), sound.getPitch(), sound.getSeed());
             }
             return null;
         }

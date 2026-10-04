@@ -127,7 +127,8 @@ public class ArmorPackModule extends PackModule<ArmorPackModule> {
             description.scripts(scripts);
             description.renderControllers(new String[] { "controller.render.armor" });
 
-            description.item(Map.of(armorItemLocation.toString(), "query.owner_identifier == 'minecraft:player'"));
+            // The attachable identifier binds it to this custom item by default.
+            // Avoid an owner query that can suppress rendering on client actor variants.
 
             EquipmentLayerType finalLayerType = layerType;
             description.textures(new HashMap<>() {
