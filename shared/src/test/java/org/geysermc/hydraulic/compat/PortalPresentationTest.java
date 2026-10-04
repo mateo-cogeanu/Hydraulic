@@ -21,7 +21,7 @@ class PortalPresentationTest {
         assertEquals(32, tile.getHeight());
         assertFalse(tile.getColorModel().hasAlpha());
         assertEquals(0xff123456, tile.getRGB(0, 0));
-        assertEquals("minecraft:geometry.full_block", PortalPresentation.GEOMETRY);
+        assertEquals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER, PortalPresentation.GEOMETRY);
     }
     @Test void portalEffectFilterPreservesOtherModEffects() {
         assertTrue(PortalPresentation.isPortalEffect("the_sift:sift_parallax"));

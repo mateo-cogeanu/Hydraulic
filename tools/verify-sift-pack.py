@@ -61,6 +61,9 @@ with ZipFile(sys.argv[1]) as pack:
         scripts = json.loads(pack.read('entity/' + actor + '.entity.json'))['minecraft:client_entity']['description']['scripts']
         for script in scripts['pre_animation']:
             assert 'if (' not in script, f'Invalid Molang conditional: {actor}'
+    culling_definitions = {json.loads(pack.read(name))["minecraft:block_culling_rules"]["description"]["identifier"]
+                           for name in names if name.startswith("block_culling/") and name.endswith(".json")}
+    assert all(len(name) < 80 for name in names if name.startswith("block_culling/")), "Culling path exceeds mobile limit"
     geometries = {}
     for name in names:
         if name.startswith('models/') and name.endswith('.json'):
@@ -73,13 +76,15 @@ with ZipFile(sys.argv[1]) as pack:
                             assert cube.get('uv') != {}, f'Invisible cube with empty faces: {name}'
                     identifier = geometry['description']['identifier']
                     if identifier.startswith('geometry.the_sift.'):
-                        culling_path = 'block_culling/cull_' + identifier.replace('.', '_').replace(':', '_') + '.json'
-                        assert culling_path in names, f'Missing shape culling: {identifier}'
+                        culling_id = 'hydraulic:cull_' + identifier.replace('.', '_').replace(':', '_')
+                        assert culling_id in culling_definitions, f'Missing shape culling: {identifier}'
     shape_culling = 0
     for name in names:
-        if not name.startswith('block_culling/cull_geometry_the_sift_') or not name.endswith('.json'):
+        if not name.startswith('block_culling/') or not name.endswith('.json'):
             continue
         body = json.loads(pack.read(name))['minecraft:block_culling_rules']
+        if not body['description']['identifier'].startswith('hydraulic:cull_geometry_the_sift_'):
+            continue
         candidates = [g for identifier, g in geometries.items() if body['description']['identifier'] == 'hydraulic:cull_' + identifier.replace('.', '_').replace(':', '_')]
         assert len(candidates) == 1, f'Culling geometry reference: {name}'
         bones = {b['name']: b for b in candidates[0]['bones']}

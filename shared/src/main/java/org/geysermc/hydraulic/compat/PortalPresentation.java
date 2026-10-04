@@ -4,7 +4,7 @@ import java.awt.image.BufferedImage;
 
 /** An opaque, bounded atlas animation for the Java portal shader. */
 public final class PortalPresentation {
-    public static final String GEOMETRY = "minecraft:geometry.full_block";
+    public static final String GEOMETRY = org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER;
     public static final int TEXTURE_SIZE = 32;
     public static final int FRAMES = 16;
     public static final int TICKS_PER_FRAME = 3;

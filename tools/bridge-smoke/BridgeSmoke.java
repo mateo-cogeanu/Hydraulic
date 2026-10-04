@@ -192,6 +192,33 @@ public class BridgeSmoke implements ModInitializer {
                     }
                 }
                 System.out.println("HYDRAULIC PERMUTATION AUDIT PASS: " + conditionStates + " native states select exactly one shared definition.");
+                int wirePositions = 0;
+                var siftLevel = java.util.stream.StreamSupport.stream(server.getAllLevels().spliterator(), false)
+                        .filter(level -> level.dimension().identifier().toString().equals("the_sift:the_sift")).findFirst().orElseThrow();
+                int biomeSize = server.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.BIOME).size();
+                for (int[] coordinates : new int[][]{{-2,2},{-1,2},{-2,1},{-1,1}}) {
+                    var chunk = siftLevel.getChunk(coordinates[0], coordinates[1]);
+                    var data = new ClientboundLevelChunkPacketData(chunk).getReadBuffer();
+                    try {
+                        for (var nativeSection : chunk.getSections()) {
+                            var decoded = org.geysermc.mcprotocollib.protocol.codec.MinecraftTypes.readChunkSection(data,
+                                    org.geysermc.geyser.registry.BlockRegistries.BLOCK_STATES.get().size(), biomeSize);
+                            if (decoded.isBlockCountEmpty() != nativeSection.hasOnlyAir()) throw new AssertionError("Chunk section empty count mismatch");
+                            for (int y=0;y<16;y++) for(int z=0;z<16;z++) for(int x=0;x<16;x++) {
+                                int id = net.minecraft.world.level.block.Block.getId(nativeSection.getBlockState(x,y,z));
+                                if (decoded.getBlockData().get(x,y,z) != id) throw new AssertionError("Native chunk state decode mismatch at " + x + "," + y + "," + z);
+                            }
+                            var translated = org.geysermc.hydraulic.block.BlockPaletteRemapper.remap(decoded.getBlockData(), org.geysermc.hydraulic.block.JavaBlockStateRemapper::translate);
+                            for (int y=0;y<16;y++) for(int z=0;z<16;z++) for(int x=0;x<16;x++) {
+                                int expected = org.geysermc.hydraulic.block.JavaBlockStateRemapper.translate(net.minecraft.world.level.block.Block.getId(nativeSection.getBlockState(x,y,z)));
+                                if (translated.get(x,y,z) != expected) throw new AssertionError("Chunk palette remap mismatch");
+                                wirePositions++;
+                            }
+                        }
+                        if (data.readableBytes() != 0) throw new AssertionError("Unconsumed chunk section bytes " + data.readableBytes());
+                    } finally { data.release(); }
+                }
+                System.out.println("HYDRAULIC CHUNK WIRE AUDIT PASS: " + wirePositions + " real Sift block positions decoded and remapped exactly.");
                 int solidMappings = 0;
                 for (var state : net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY) {
                     if (!BuiltInRegistries.BLOCK.getKey(state.getBlock()).getNamespace().equals("the_sift")) continue;
@@ -244,11 +271,12 @@ public class BridgeSmoke implements ModInitializer {
                     for (var components : all) {
                         if (components == null || components.geometry() == null) continue;
                         String id = components.geometry().identifier();
+                        if (block.identifier().startsWith("the_sift:") && id.equals("minecraft:geometry.full_block")) throw new AssertionError("Sift cube still relies on built-in geometry: " + block.identifier());
                         if (block.identifier().equals("the_sift:sift_portal")) {
-                            if (!id.equals(org.geysermc.hydraulic.compat.PortalPresentation.GEOMETRY)) throw new AssertionError("Portal is not a built-in cube");
+                            if (!id.equals(org.geysermc.hydraulic.compat.PortalPresentation.GEOMETRY)) throw new AssertionError("Portal is not an explicit cube");
                             if (components.lightEmission() != 15) throw new AssertionError("Portal not luminous");
                             if (!components.materialInstances().get("*").renderMethod().equals("opaque")) throw new AssertionError("Portal is translucent");
-                            System.out.println("HYDRAULIC PORTAL SMOKE PASS: built-in opaque full block.");
+                            System.out.println("HYDRAULIC PORTAL SMOKE PASS: explicit opaque full block.");
                         }
                         if (!id.startsWith("geometry.the_sift.") && !id.equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER)) continue;
                         var nbt = (org.cloudburstmc.nbt.NbtMap) convert.invoke(null, components);
@@ -257,7 +285,7 @@ public class BridgeSmoke implements ModInitializer {
                     }
                 }
                 if (culled < 5) throw new AssertionError("Culling not applied: " + culled);
-                System.out.println("HYDRAULIC CULLING SMOKE PASS: " + culled + " custom shape components have culling rules; five terrain types use explicit culled full cubes.");
+                System.out.println("HYDRAULIC CULLING SMOKE PASS: " + culled + " custom shape components have culling rules; all Sift full-block presentations use explicit culled cubes.");
                 if (frameBlocks != 5) throw new AssertionError("Missing portal frame mappings: " + frameBlocks);
                 String key = "advancement.the_sift.story.brave_the_unknown.title";
                 String translation = org.geysermc.geyser.text.MinecraftLocale.getLocaleStringIfPresent(key, "en_us");

@@ -94,7 +94,9 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
         for (var geometry : document.getAsJsonArray("minecraft:geometry")) {
             JsonObject rules = GeometryCulling.definition(geometry.getAsJsonObject());
             String id = rules.getAsJsonObject("minecraft:block_culling_rules").getAsJsonObject("description").get("identifier").getAsString();
-            pack.addExtraFile(rules, "block_culling/" + id.split(":")[1] + ".json");
+            // Resource-pack paths must remain short on Bedrock mobile platforms.
+            String filename = java.util.UUID.nameUUIDFromBytes(id.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
+            pack.addExtraFile(rules, "block_culling/" + filename + ".json");
         }
     }
 
@@ -347,7 +349,8 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                     componentsBuilder.collisionBox(createBoxComponent(collisionShape));
                 } else {
                     componentsBuilder.geometry(GeometryComponent.builder()
-                            .identifier("minecraft:geometry.full_block")
+                            .identifier(blockLocation.getNamespace().equals("the_sift")
+                                    ? StructureGeometry.IDENTIFIER : "minecraft:geometry.full_block")
                             .build());
                 }
 
