@@ -1,6 +1,11 @@
 package org.geysermc.hydraulic.item;
 
 import com.google.auto.service.AutoService;
+import com.google.gson.JsonParser;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.io.IOException;
+import java.util.Locale;
 import net.kyori.adventure.key.Key;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.component.DataComponents;
@@ -85,14 +90,30 @@ public class ArmorPackModule extends PackModule<ArmorPackModule> {
             Identifier armorTextureLocation = equippable.assetId().map(ResourceKey::identifier).orElseThrow(); // Checked above to ensure all armor processed has an asset id, so this shouldn't throw (This instead of get to prevent yellow lines)
 
             Equipment equipment = context.javaResourcePack().equipment(Key.key(armorTextureLocation.toString()));
-            if (equipment == null) {
+            Key layerTexture = null;
+            if (equipment != null) {
+                List<EquipmentLayer> layers = equipment.layers().get(layerType);
+                if (layers != null && !layers.isEmpty()) layerTexture = layers.getFirst().texture();
+            }
+            if (layerTexture == null) {
+                // Mods often omit pack.mcmeta. Older readers then look in models/equipment
+                // instead of equipment, or reject newly added layer types such as humanoid_baby.
+                Path file = context.mod().resolveFile("assets/" + armorTextureLocation.getNamespace()
+                        + "/equipment/" + armorTextureLocation.getPath() + ".json");
+                if (file != null) {
+                    try (var reader = Files.newBufferedReader(file)) {
+                        layerTexture = EquipmentTextureResolver.texture(JsonParser.parseReader(reader),
+                                layerType.name().toLowerCase(Locale.ROOT));
+                    } catch (IOException | RuntimeException e) {
+                        context.logger().warn("Could not read equipment {}: {}", armorTextureLocation, e.getMessage());
+                    }
+                }
+            }
+            if (layerTexture == null) {
+                context.logger().warn("Missing equipment texture {} for {}", armorTextureLocation, armorItemLocation);
                 continue;
             }
-            List<EquipmentLayer> layers = equipment.layers().get(layerType);
-            if (layers == null || layers.isEmpty()) {
-                continue; // We have no layers that we can convert, so we can just skip this one
-            }
-            Key layerTexture = layers.getFirst().texture();
+            Key resolvedLayerTexture = layerTexture;
 
             Attachables armorAttachable = new Attachables();
             armorAttachable.formatVersion("1.10.0");
@@ -103,19 +124,12 @@ public class ArmorPackModule extends PackModule<ArmorPackModule> {
             description.scripts(ATTACHABLE_SCRIPTS);
             description.renderControllers(new String[] { "controller.render.armor" });
 
-            // Change the query to match the item
-            // This should always work as armour should have 2d item models
-            // If its 3d this will break as the item won't have the `item.` prefix
-            // TODO Register another attachable for 3d items? Or just work out which is correct from here
-            Map<String, String> items = new HashMap<>() {{
-                put(armorItemLocation + "_item", "query.owner_identifier == 'minecraft:player'");
-            }};
-            description.item(items);
+            description.item(Map.of(armorItemLocation.toString(), "query.owner_identifier == 'minecraft:player'"));
 
             EquipmentLayerType finalLayerType = layerType;
             description.textures(new HashMap<>() {
                 {
-                    put("default", String.format(BEDROCK_ARMOR_TEXTURE_LOCATION, layerTexture.namespace(), finalLayerType.name().toLowerCase(), layerTexture.value()));
+                    put("default", String.format(BEDROCK_ARMOR_TEXTURE_LOCATION, resolvedLayerTexture.namespace(), finalLayerType.name().toLowerCase(Locale.ROOT), resolvedLayerTexture.value()));
                     put("enchanted", "textures/misc/enchanted_actor_glint");
                 }
             });

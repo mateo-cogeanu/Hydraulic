@@ -1,6 +1,13 @@
 package org.geysermc.hydraulic.block;
 
 import com.google.auto.service.AutoService;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.common.hash.Hashing;
+import java.nio.charset.StandardCharsets;
+import org.geysermc.pack.converter.type.model.ModelConverter;
+import org.geysermc.pack.converter.pipeline.ConversionContext;
 import net.kyori.adventure.key.Key;
 import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.BlockPos;
@@ -17,8 +24,8 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.state.properties.Property;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.geysermc.geyser.api.block.custom.CustomBlockData;
 import org.geysermc.geyser.api.block.custom.CustomBlockPermutation;
@@ -66,15 +73,15 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiFunction;
 
 @AutoService(PackModule.class)
 public class BlockPackModule extends PackModule<BlockPackModule> {
     private static final String STATE_CONDITION = "query.block_property('%s') == %s";
 
     private final Map<String, StateDefinition> blockStates = new HashMap<>();
+    private final Map<Key, List<ModelDefinition>> multipartModels = new HashMap<>();
+    private final Map<String, ModelDefinition> resolvedStates = new HashMap<>();
     private final Set<String> emptyModels = new HashSet<>();
 
     public BlockPackModule() {
@@ -90,36 +97,35 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
         }
 
         ModStorage storage = context.storage();
-        if (storage.materials().materials().isEmpty()) {
-            PackLogListener packLogListener = new PackLogListener(context.logger());
+        // Rebuild materials from current assets when the installed mod changes.
+        PackLogListener packLogListener = new PackLogListener(context.logger());
 
-            Materials materials = new Materials();
-            for (Model model : context.assets(ResourcePack::models)) {
-                Model stitchedModel = new ModelStitcher(context.modelProvider(), model, packLogListener).stitch();
-                if (stitchedModel == null) {
-                    context.logger().warn("Could not find a stitched model for block {}", model.key());
+        Materials materials = new Materials();
+        for (Model model : context.assets(ResourcePack::models)) {
+            Model stitchedModel = new ModelStitcher(context.modelProvider(), model, packLogListener).stitch();
+            if (stitchedModel == null) {
+                context.logger().warn("Could not find a stitched model for block {}", model.key());
+                continue;
+            }
+
+            Map<String, String> textures = new HashMap<>();
+            Map<String, ModelTexture> modelTextures = getTextures(stitchedModel.textures());
+            for (Map.Entry<String, ModelTexture> entry : modelTextures.entrySet()) {
+                ModelTexture modelTexture = getModelTexture(modelTextures, entry.getKey());
+                if (modelTexture == null || modelTexture.key() == null) {
+                    // LOGGER.warn("Could not find a texture for key {} in model {}", entry.getKey(), model.key());
                     continue;
                 }
 
-                Map<String, String> textures = new HashMap<>();
-                Map<String, ModelTexture> modelTextures = getTextures(stitchedModel.textures());
-                for (Map.Entry<String, ModelTexture> entry : modelTextures.entrySet()) {
-                    ModelTexture modelTexture = getModelTexture(modelTextures, entry.getKey());
-                    if (modelTexture == null || modelTexture.key() == null) {
-                        // LOGGER.warn("Could not find a texture for key {} in model {}", entry.getKey(), model.key());
-                        continue;
-                    }
-
-                    textures.put(entry.getKey(), modelTexture.key().toString());
-                }
-
-                Materials.Material material = new Materials.Material(textures);
-                materials.addMaterial(model.key().toString(), material);
+                textures.put(entry.getKey(), modelTexture.key().toString());
             }
 
-            storage.materials(materials);
-            storage.save();
+            Materials.Material material = new Materials.Material(textures);
+            materials.addMaterial(model.key().toString(), material);
         }
+
+        storage.materials(materials);
+        storage.save();
 
         // Check for empty models
         List<Block> blocks = context.registryValues(BuiltInRegistries.BLOCK);
@@ -154,6 +160,62 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
     private void postProcess(@NotNull PackPostProcessContext<BlockPackModule> context) {
         ResourcePack assets = context.javaResourcePack();
         BedrockResourcePack bedrockPack = context.bedrockResourcePack();
+
+        // Each matching multipart selector contributes a separately rotated part.
+        // Export a complete geometry instead of dropping every part after the first match.
+        for (var entry : multipartModels.entrySet()) {
+            if (!entry.getKey().namespace().equals(context.mod().namespace())) continue;
+            JsonObject geometry = null;
+            JsonArray bones = new JsonArray();
+            int partIndex = 0;
+            for (ModelDefinition part : entry.getValue()) {
+                String prefix = "part_" + partIndex++ + "_";
+                try {
+                    var converted = ModelConverter.INSTANCE.convert(part.model(),
+                            new ConversionContext(context.mod().name(), new PackLogListener(context.logger())));
+                    if (converted == null) continue;
+                    JsonObject partGeometry = new Gson().toJsonTree(converted.model()).getAsJsonObject()
+                            .getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
+                    if (geometry == null) geometry = partGeometry.deepCopy();
+                    JsonObject rootBone = new JsonObject();
+                    rootBone.addProperty("name", prefix + "root");
+                    rootBone.add("pivot", new Gson().toJsonTree(new float[]{0, 8, 0}));
+                    rootBone.add("rotation", new Gson().toJsonTree(new float[]{-part.variant().x(), -part.variant().y(), 0}));
+                    bones.add(rootBone);
+                    for (var value : partGeometry.getAsJsonArray("bones")) {
+                        JsonObject bone = value.getAsJsonObject();
+                        bone.addProperty("name", prefix + bone.get("name").getAsString());
+                        bone.addProperty("parent", prefix + "root");
+                        if (bone.has("cubes")) {
+                            for (var cube : bone.getAsJsonArray("cubes")) {
+                                JsonObject uv = cube.getAsJsonObject().getAsJsonObject("uv");
+                                if (uv == null) continue;
+                                for (var face : uv.entrySet()) {
+                                    JsonObject faceUv = face.getValue().getAsJsonObject();
+                                    if (faceUv.has("material_instance")) {
+                                        faceUv.addProperty("material_instance", prefix + faceUv.get("material_instance").getAsString());
+                                    }
+                                }
+                            }
+                        }
+                        bones.add(bone);
+                    }
+                } catch (Exception e) {
+                    throw new IllegalStateException("Unable to convert multipart model " + entry.getKey(), e);
+                }
+            }
+            if (geometry != null) {
+                String name = entry.getKey().value().substring(entry.getKey().value().lastIndexOf('/') + 1);
+                geometry.getAsJsonObject("description").addProperty("identifier", "geometry." + entry.getKey().namespace() + "." + name);
+                geometry.add("bones", bones);
+                JsonObject document = new JsonObject();
+                document.addProperty("format_version", "1.16.0");
+                JsonArray geometries = new JsonArray();
+                geometries.add(geometry);
+                document.add("minecraft:geometry", geometries);
+                bedrockPack.addExtraFile(document, "models/blocks/" + name + ".json");
+            }
+        }
 
         for (Texture texture : assets.textures()) {
             Key key = texture.key();
@@ -278,7 +340,7 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
 
                 Materials materials = context.storage().materials();
                 Materials.Material material = materials.material(key.toString());
-                if (material != null) {
+                if (material != null && !material.textures().isEmpty()) {
                     // Add a default texture, can be replaced by the below (I think)
                     Map.Entry<String, String> firstEntry = material.textures().entrySet().iterator().next();
 
@@ -368,7 +430,7 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
             CustomBlockComponents.Builder componentsBuilder = baseComponentBuilder
                     .displayName("%" + block.getDescriptionId())
                     .friction(Math.min(1 - block.getFriction(), 0.9f))
-                    .destructibleByMining(block.defaultDestroyTime()) // TODO: Check
+                    .destructibleByMining(block.defaultDestroyTime() < 0 ? Float.MAX_VALUE : block.defaultDestroyTime())
                     // .unitCube(true) // TODO: Geometry conversion
                     .selectionBox(createBoxComponent(shape))
                     .collisionBox(createBoxComponent(collisionShape));
@@ -429,17 +491,13 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                     context.logger().warn("Failed to get pick item for block {}: {}", blockLocation, e.getMessage());
                 }
 
-                /*
-                List<AABB> aabbs = collisionShape.toAabbs();
-                JavaBoundingBox[] bbs = new JavaBoundingBox[aabbs.size()];
-                for (int i = 0; i < aabbs.size(); i++) {
-                    AABB aabb = aabbs.get(i);
-                    bbs[i] = new JavaBoundingBox(aabb.minX, aabb.minY, aabb.minZ, aabb.maxX, aabb.maxY, aabb.maxZ);
-                }
-
-                javaBlockStateBuilder.collision(bbs);
-                 */
-                javaBlockStateBuilder.collision(new JavaBoundingBox[0]); // TODO
+                VoxelShape stateCollision = state.getCollisionShape(new SingletonBlockGetter(state), BlockPos.ZERO);
+                JavaBoundingBox[] boxes = stateCollision.toAabbs().stream()
+                        .map(box -> new JavaBoundingBox(
+                                (box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2, (box.minZ + box.maxZ) / 2,
+                                box.maxX - box.minX, box.maxY - box.minY, box.maxZ - box.minZ))
+                        .toArray(JavaBoundingBox[]::new);
+                javaBlockStateBuilder.collision(boxes);
 
                 event.registerOverride(javaBlockStateBuilder.build(), customBlockState);
             }
@@ -463,96 +521,71 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
             multiVariant = packState.variants().get("");
         }
 
-        // Try and match the state
-        // TODO Handle multiple variants since we only take the first match
-        //      Will likely need to generate more geometry files and then alter bone visibility for each part
-        if (multiVariant == null) {
-            for (Selector selector : packState.multipart()) {
-                // Ignore none conditions
-                if (selector.condition() == Condition.NONE) {
-                    continue;
-                }
-
-                List<Condition> conditions = new ArrayList<>();
-                BiFunction<Boolean, Boolean, Boolean> comparator = (a, b) -> false;
-                if (selector.condition() instanceof Condition.And andCondition) {
-                    conditions.addAll(andCondition.conditions());
-                    comparator = Boolean::logicalAnd;
-                } else if (selector.condition() instanceof Condition.Or orCondition) {
-                    conditions.addAll(orCondition.conditions());
-                    comparator = Boolean::logicalOr;
-                } else if (selector.condition() instanceof Condition.Match) {
-                    conditions.add(selector.condition());
-                }
-
-                boolean first = true;
-                boolean result = true;
-                for (Condition condition : conditions) {
-                    if (!(condition instanceof Condition.Match match)) {
-                        context.logger().warn("Non match condition found in {}", blockLocation);
-                        continue;
-                    }
-
-                    Property<?> foundProperty = null;
-                    for (Property<?> property : state.getProperties()) {
-                        if (property.getName().equals(match.key())) {
-                            foundProperty = property;
-                            break;
-                        }
-                    }
-
-                    if (foundProperty == null) {
-                        result = false;
-                        continue;
-                    }
-
-                    boolean test = state.getValue(foundProperty).toString().equals(match.value().toString());
-                    if (!first) {
-                        result = comparator.apply(result, test);
-                    } else {
-                        result = test;
-                        first = false;
-                    }
-                }
-
-                if (result) {
-                    multiVariant = selector.variant();
-                    break;
-                }
-            }
-        }
-
-        // Get the default multipart variant if we have no match
-        if (multiVariant == null) {
-            Optional<Selector> selector = packState.multipart().stream().filter(multipart -> multipart.condition() == Condition.NONE).findFirst();
-            if (selector.isPresent()) {
-                multiVariant = selector.get().variant();
-            }
-
-            // LOGGER.warn("Missing multipart state conversion for block {} {}", blockLocation, state);
-        }
-
-        // We have a match! Now we need to find the model
+        String stateKey = BlockStateParser.serialize(state);
+        ModelDefinition cached = resolvedStates.get(stateKey);
+        if (cached != null) return cached;
+        List<ModelDefinition> parts = new ArrayList<>();
         if (multiVariant != null && !multiVariant.variants().isEmpty()) {
-            // TODO: Handle multiple variants?
-            Variant variant = multiVariant.variants().get(0);
-            Key modelKey = variant.model();
-
-            Model model = definition.modelProvider().model(modelKey);
-            if (model == null) {
-                context.logger().warn("Missing model {} for block {}", modelKey, blockLocation);
-            } else {
-                return new ModelDefinition(model, variant);
+            Variant variant = multiVariant.variants().getFirst();
+            Model model = definition.modelProvider().model(variant.model());
+            if (model != null) parts.add(new ModelDefinition(model, variant));
+        } else {
+            Map<String, String> properties = new HashMap<>();
+            for (Property<?> property : state.getProperties()) {
+                properties.put(property.getName(), propertyValue(state, property));
             }
+            for (Selector selector : packState.multipart()) {
+                if (!BlockStateConditions.matches(selector.condition(), properties) || selector.variant().variants().isEmpty()) continue;
+                Variant variant = selector.variant().variants().getFirst();
+                Model model = definition.modelProvider().model(variant.model());
+                if (model != null) {
+                    Model stitched = new ModelStitcher(definition.modelProvider(), model, new PackLogListener(context.logger())).stitch();
+                    if (stitched != null) parts.add(new ModelDefinition(stitched, variant));
+                }
+            }
+        }
+        if (parts.size() == 1) {
+            resolvedStates.put(stateKey, parts.getFirst());
+            return parts.getFirst();
+        }
+        if (parts.size() > 1) {
+            String presentation = parts.stream().map(part -> part.model().key() + ":" + part.variant().x() + ":" + part.variant().y() + ":" + part.variant().uvLock()).collect(java.util.stream.Collectors.joining(";"));
+            String suffix = Hashing.sha256().hashString(presentation, StandardCharsets.UTF_8).toString().substring(0, 16);
+            Key key = Key.key(blockLocation.getNamespace(), "block/hydraulic_multipart_" + suffix);
+            Map<String, ModelTexture> textures = new HashMap<>();
+            Map<String, String> materials = new HashMap<>();
+            int partIndex = 0;
+            for (ModelDefinition part : parts) {
+                String prefix = "part_" + partIndex++ + "_";
+                Map<String, ModelTexture> variables = getTextures(part.model().textures());
+                for (String name : variables.keySet()) {
+                    ModelTexture texture = getModelTexture(variables, name);
+                    if (texture != null && texture.key() != null) {
+                        textures.put(prefix + name, texture);
+                        materials.put(prefix + name, texture.key().toString());
+                    }
+                }
+            }
+            Model model = Model.model().key(key).textures(ModelTextures.builder().variables(textures).build())
+                    .elements(parts.stream().flatMap(part -> part.model().elements().stream()).toList()).build();
+            multipartModels.put(key, List.copyOf(parts));
+            context.storage().materials().addMaterial(key.toString(), new Materials.Material(materials));
+            ModelDefinition result = new ModelDefinition(model, Variant.builder().model(key).build());
+            resolvedStates.put(stateKey, result);
+            return result;
         }
 
         return null;
     }
 
+    private static <T extends Comparable<T>> String propertyValue(BlockState state, Property<T> property) {
+        return property.getName(state.getValue(property));
+    }
+
     private static MultiVariant matchState(@NotNull BlockState state, @NotNull Map<String, MultiVariant> variants) {
         List<String> properties = new ArrayList<>();
         for (Property<?> property : state.getProperties()) {
-            properties.add(property.getName() + "=" + state.getValue(property).toString().toLowerCase());
+            properties.add(property.getName() + "=" + propertyValue(state, property));
         }
 
         for (Map.Entry<String, MultiVariant> entry : variants.entrySet()) {

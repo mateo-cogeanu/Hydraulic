@@ -70,6 +70,10 @@ public class PackUtil {
         Model current = model;
         Key parentKey;
         while ((parentKey = current.parent()) != null) {
+            if (keys.contains(parentKey)) {
+                LOGGER.warn("Cyclic model parent chain at {}", parentKey);
+                break;
+            }
             keys.add(parentKey);
 
             Model parent = provider.model(parentKey);

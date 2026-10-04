@@ -7,6 +7,7 @@ import team.unnamed.creative.ResourcePack;
 import team.unnamed.creative.model.Model;
 
 import java.util.Collection;
+import java.util.Objects;
 
 public class CustomModelConverter implements AssetExtractor<Model> {
     private final ModelStitcher.Provider modelProvider;
@@ -19,6 +20,7 @@ public class CustomModelConverter implements AssetExtractor<Model> {
     public Collection<Model> extract(ResourcePack pack, ExtractionContext context) {
         return pack.models().stream()
                 .map(model -> new ModelStitcher(this.modelProvider, model, context.logListener()).stitch())
+                .filter(Objects::nonNull)
                 .toList();
     }
 }

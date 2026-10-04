@@ -3,6 +3,7 @@ package org.geysermc.hydraulic.item;
 import com.google.auto.service.AutoService;
 import net.kyori.adventure.key.Key;
 import net.minecraft.core.DefaultedRegistry;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.*;
@@ -35,6 +36,7 @@ import java.util.*;
 
 @AutoService(PackModule.class)
 public class ItemPackModule extends TexturePackModule<ItemPackModule> {
+    private final Map<Key, ItemModel> itemModels = new HashMap<>();
     private final Set<Identifier> itemsWith2dIcon = new LinkedHashSet<>();
     private final Set<Identifier> handheldItems = new LinkedHashSet<>();
     private final Map<String, String> itemBuiltinTexture = new HashMap<>();
@@ -47,41 +49,29 @@ public class ItemPackModule extends TexturePackModule<ItemPackModule> {
     }
 
     private void handleModel(@NotNull PackPreProcessContext<ItemPackModule> context, ItemModel itemModel, Identifier itemLocation) {
-        if (itemModel instanceof ReferenceItemModel referenceModel) {
-            Key modelKey = referenceModel.model();
-            Model model = context.modelProvider().model(modelKey);
-            if (model == null) {
-                context.logger().debug("Could not resolve model {} for item {}", modelKey, itemLocation);
-                return;
-            }
-
-            // Build the list of all parents in the model chain
-            List<Key> parents = PackUtil.modelParents(context.modelProvider(), model);
-
-            if (parents.contains(Model.ITEM_HANDHELD)) {
-                itemsWith2dIcon.add(itemLocation); // item/handheld has the parent item/generated, so lets assume it's 2D
-                handheldItems.add(itemLocation);
-            } else if (parents.contains(Model.ITEM_GENERATED) || parents.contains(Model.BUILT_IN_GENERATED)) {
-                itemsWith2dIcon.add(itemLocation);
-            }
-        } else if (itemModel instanceof SelectItemModel selectModel) { // See if we can actually do select models here
-            handleModel(context, selectModel.fallback(), itemLocation);
-        } else if (itemModel instanceof ConditionItemModel conditionModel) {
-            handleModel(context, conditionModel.onTrue(), itemLocation);
-        } else if (itemModel instanceof CompositeItemModel compositeModel) { // TODO: See if we can stitch together item models, for now this will use just the first model
-            List<ItemModel> models = compositeModel.models();
-            if (!models.isEmpty()) {
-                handleModel(context, models.getFirst(), itemLocation);
-            }
-        } else if (itemModel instanceof RangeDispatchItemModel rangeDispatchModel) {
-            handleModel(context, rangeDispatchModel.fallback(), itemLocation);
+        ReferenceItemModel referenceModel = ItemModelResolver.reference(itemModel);
+        if (referenceModel == null) return;
+        Model model = context.modelProvider().model(referenceModel.model());
+        if (model == null) return;
+        List<Key> parents = PackUtil.modelParents(context.modelProvider(), model);
+        if (parents.contains(Model.ITEM_HANDHELD)) {
+            itemsWith2dIcon.add(itemLocation);
+            handheldItems.add(itemLocation);
+        } else if (parents.contains(Model.ITEM_GENERATED) || parents.contains(Model.BUILT_IN_GENERATED)) {
+            itemsWith2dIcon.add(itemLocation);
         }
+    }
+
+    private Key modelKey(Item item, Identifier itemLocation) {
+        Identifier definitionId = item.components().get(DataComponents.ITEM_MODEL);
+        ItemModel definition = definitionId == null ? null : itemModels.get(Key.key(definitionId.toString()));
+        ReferenceItemModel reference = ItemModelResolver.reference(definition);
+        return reference == null ? Key.key(itemLocation.getNamespace(), "item/" + itemLocation.getPath()) : reference.model();
     }
 
     private void preProcess(@NotNull PackPreProcessContext<ItemPackModule> context) {
         for (team.unnamed.creative.item.Item item : context.assets(ResourcePack::items)) {
-            Identifier itemLocation = HydraulicKey.of(item.key()).identifier();
-            handleModel(context, item.model(), itemLocation);
+            itemModels.put(item.key(), item.model());
         }
 
         List<Item> items = context.registryValues(BuiltInRegistries.ITEM);
@@ -89,7 +79,9 @@ public class ItemPackModule extends TexturePackModule<ItemPackModule> {
         for (Item item : items) {
             Identifier itemLocation = BuiltInRegistries.ITEM.getKey(item);
 
-            Model baseModel = context.modelProvider().model(Key.key(itemLocation.getNamespace(), "item/" + itemLocation.getPath()));
+            Identifier definitionId = item.components().get(DataComponents.ITEM_MODEL);
+            handleModel(context, definitionId == null ? null : itemModels.get(Key.key(definitionId.toString())), itemLocation);
+            Model baseModel = context.modelProvider().model(modelKey(item, itemLocation));
             if (baseModel == null) {
                 continue;
             }
@@ -98,7 +90,6 @@ public class ItemPackModule extends TexturePackModule<ItemPackModule> {
             if (model == null) {
                 continue;
             }
-
             List<ModelTexture> layers = model.textures().layers();
             if (layers == null || layers.isEmpty()) {
                 continue;
@@ -113,7 +104,6 @@ public class ItemPackModule extends TexturePackModule<ItemPackModule> {
     }
 
     private void postProcess(@NotNull PackPostProcessContext<ItemPackModule> context) {
-        ResourcePack assets = context.javaResourcePack();
         BedrockResourcePack bedrockPack = context.bedrockResourcePack();
 
         List<Item> items = context.registryValues(BuiltInRegistries.ITEM);
@@ -124,7 +114,7 @@ public class ItemPackModule extends TexturePackModule<ItemPackModule> {
         for (Item item : items) {
             Identifier itemLocation = BuiltInRegistries.ITEM.getKey(item);
 
-            Model baseModel = assets.model(Key.key(itemLocation.getNamespace(), "item/" + itemLocation.getPath()));
+            Model baseModel = context.modelProvider().model(modelKey(item, itemLocation));
             if (baseModel == null) {
                 context.logger().warn("Item {} has no item model, skipping", itemLocation);
                 continue;
@@ -132,6 +122,7 @@ public class ItemPackModule extends TexturePackModule<ItemPackModule> {
 
             Model model = new ModelStitcher(context.modelProvider(), baseModel, packLogListener).stitch();
 
+            if (model == null) continue;
             List<ModelTexture> layers = model.textures().layers();
             if (layers == null || layers.isEmpty()) {
                 // Don't warn if a block as they can use the block model
@@ -143,7 +134,11 @@ public class ItemPackModule extends TexturePackModule<ItemPackModule> {
             }
 
             ModelTexture layer0 = layers.getFirst();
-            String outputLoc = getOutputFromModel(context, layer0.key()); // TODO: sort this out, layer0.key() can be null, but the method we use doesn't want that
+            if (layer0.key() == null) {
+                context.logger().warn("Item {} has an unresolved layer0 texture", itemLocation);
+                continue;
+            }
+            String outputLoc = getOutputFromModel(context, layer0.key());
             bedrockPack.addItemTexture(itemLocation.toString(), outputLoc.replace(".png", ""));
         }
     }

@@ -3,6 +3,8 @@ architectury {
 }
 
 dependencies {
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
     compileOnly(libs.mixin)
     compileOnly(libs.mixinextras)
     compileOnly(libs.geyser.api)
@@ -22,4 +24,8 @@ dependencies {
 
     // Only here to suppress "unknown enum constant EnvType.CLIENT" warnings.
     compileOnly(libs.fabric.loader)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

@@ -38,6 +38,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -125,12 +126,15 @@ public class PackManager {
                 AssetConverters.MODEL
         ));
 
+        Set<Class<?>> subscribedEvents = new HashSet<>();
         for (PackModule<?> module : ServiceLoader.load(PackModule.class)) {
             this.modules.add(module);
 
             GeyserApi.api().eventBus().register(this.hydraulic, module);
             module.eventListeners().forEach((eventClass, listeners) -> {
-                GeyserApi.api().eventBus().subscribe(this.hydraulic, eventClass, this::callEvents);
+                if (subscribedEvents.add(eventClass)) {
+                    GeyserApi.api().eventBus().subscribe(this.hydraulic, eventClass, this::callEvents);
+                }
             });
 
             for (ModInfo mod : mods) {

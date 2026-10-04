@@ -49,3 +49,7 @@ to receive the matching Bedrock creative group.
 - Download: https://geysermc.org/download?project=other-projects&hydraulic=expanded
 - Discord: https://discord.gg/geysermc
 - Donate: https://opencollective.com/geysermc
+
+### The Sift compatibility preview
+
+This branch adds reusable block, item, armor, and sound conversion fixes tested with Mielon's The Sift 1.1.2 on Fabric 26.3. Full Bedrock support is still in progress. See [the compatibility report](docs/sift-compatibility.md) for validation and remaining entity, fluid, portal, and client-rendering work.
