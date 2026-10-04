@@ -20,6 +20,15 @@ import java.util.*;
 
 /** Unshipped Fabric smoke mod: tests native-to-MCProtocolLib wire compatibility. */
 public class BridgeSmoke implements ModInitializer {
+    private static int readBedrockInt(io.netty.buffer.ByteBuf buffer) {
+        int raw = 0;
+        for (int shift = 0; shift < 35; shift += 7) {
+            int value = buffer.readUnsignedByte();
+            raw |= (value & 127) << shift;
+            if ((value & 128) == 0) return (raw >>> 1) ^ -(raw & 1);
+        }
+        throw new AssertionError("Oversized Bedrock varint");
+    }
     public void onInitialize() {
         java.util.concurrent.atomic.AtomicBoolean done = new java.util.concurrent.atomic.AtomicBoolean();
         ServerTickEvents.END_SERVER_TICK.register(server -> {
@@ -193,6 +202,7 @@ public class BridgeSmoke implements ModInitializer {
                 }
                 System.out.println("HYDRAULIC PERMUTATION AUDIT PASS: " + conditionStates + " native states select exactly one shared definition.");
                 int wirePositions = 0;
+                int bedrockWirePositions = 0;
                 var siftLevel = java.util.stream.StreamSupport.stream(server.getAllLevels().spliterator(), false)
                         .filter(level -> level.dimension().identifier().toString().equals("the_sift:the_sift")).findFirst().orElseThrow();
                 int biomeSize = server.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.BIOME).size();
@@ -214,11 +224,38 @@ public class BridgeSmoke implements ModInitializer {
                                 if (translated.get(x,y,z) != expected) throw new AssertionError("Chunk palette remap mismatch");
                                 wirePositions++;
                             }
+                            for (var bedrockMappings : org.geysermc.geyser.registry.BlockRegistries.BLOCKS.get().values()) {
+                                var storage = new org.geysermc.geyser.level.chunk.BlockStorage(bedrockMappings.getBedrockAir().getRuntimeId());
+                                for (int y=0;y<16;y++) for(int z=0;z<16;z++) for(int x=0;x<16;x++) {
+                                    storage.setFullBlock((x << 8) | (z << 4) | y, bedrockMappings.getBedrockBlockId(translated.get(x,y,z)));
+                                }
+                                var encoded = Unpooled.buffer();
+                                try {
+                                    storage.writeToNetwork(encoded);
+                                    int header = encoded.readUnsignedByte();
+                                    if ((header & 1) != 1) throw new AssertionError("Expected runtime palette");
+                                    var version = org.geysermc.geyser.level.chunk.bitarray.BitArrayVersion.forBitsCeil(header >> 1);
+                                    var decodedBits = version.createArray(4096);
+                                    int[] words = decodedBits.getWords();
+                                    for (int w=0;w<words.length;w++) words[w] = encoded.readIntLE();
+                                    int paletteSize = (header >> 1) == 0 ? 1 : readBedrockInt(encoded);
+                                    int[] paletteIds = new int[paletteSize];
+                                    for(int i=0;i<paletteSize;i++) paletteIds[i]=readBedrockInt(encoded);
+                                    for (int y=0;y<16;y++) for(int z=0;z<16;z++) for(int x=0;x<16;x++) {
+                                        int expected = bedrockMappings.getBedrockBlockId(translated.get(x,y,z));
+                                        int actual = paletteIds[decodedBits.get((x << 8) | (z << 4) | y)];
+                                        if (actual != expected) throw new AssertionError("Bedrock palette wire mismatch");
+                                        bedrockWirePositions++;
+                                    }
+                                    if (encoded.isReadable()) throw new AssertionError("Unused Bedrock palette bytes");
+                                } finally { encoded.release(); }
+                            }
                         }
                         if (data.readableBytes() != 0) throw new AssertionError("Unconsumed chunk section bytes " + data.readableBytes());
                     } finally { data.release(); }
                 }
                 System.out.println("HYDRAULIC CHUNK WIRE AUDIT PASS: " + wirePositions + " real Sift block positions decoded and remapped exactly.");
+                System.out.println("HYDRAULIC BEDROCK PALETTE WIRE AUDIT PASS: " + bedrockWirePositions + " block positions encoded and decoded exactly.");
                 int solidMappings = 0;
                 for (var state : net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY) {
                     if (!BuiltInRegistries.BLOCK.getKey(state.getBlock()).getNamespace().equals("the_sift")) continue;
@@ -280,11 +317,16 @@ public class BridgeSmoke implements ModInitializer {
                         }
                         if (!id.startsWith("geometry.the_sift.") && !id.equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER)) continue;
                         var nbt = (org.cloudburstmc.nbt.NbtMap) convert.invoke(null, components);
+                        boolean cullingEnabled = org.geysermc.hydraulic.HydraulicImpl.instance().getConfig().siftFaceCulling();
+                        if (!cullingEnabled) {
+                            if (nbt.getCompound("minecraft:geometry").containsKey("culling")) throw new AssertionError("Diagnostic still includes culling");
+                            continue;
+                        }
                         if (!nbt.getCompound("minecraft:geometry").getString("culling").equals((id.equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER) ? org.geysermc.hydraulic.block.StructureGeometry.CULLING : org.geysermc.hydraulic.block.GeometryCulling.identifier(id)))) throw new AssertionError("Culling missing for " + block.identifier());
                         culled++;
                     }
                 }
-                if (culled < 5) throw new AssertionError("Culling not applied: " + culled);
+                if (org.geysermc.hydraulic.HydraulicImpl.instance().getConfig().siftFaceCulling() && culled < 5) throw new AssertionError("Culling not applied: " + culled);
                 System.out.println("HYDRAULIC CULLING SMOKE PASS: " + culled + " custom shape components have culling rules; all Sift full-block presentations use explicit culled cubes.");
                 if (frameBlocks != 5) throw new AssertionError("Missing portal frame mappings: " + frameBlocks);
                 String key = "advancement.the_sift.story.brave_the_unknown.title";

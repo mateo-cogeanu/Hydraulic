@@ -12,6 +12,11 @@ public interface HydraulicConfig {
         return true;
     }
 
+    @Comment("Cull covered Sift model faces. Temporarily set false and restart to diagnose missing terrain; all models remain. Prefer Windows for this test because unculling increases rendering cost.")
+    default boolean siftFaceCulling() {
+        return true;
+    }
+
     @Comment("Mods that should be ignored")
     default List<String> ignoredMods() {
         return List.of("this-example-mod-id-should-be-ignored",

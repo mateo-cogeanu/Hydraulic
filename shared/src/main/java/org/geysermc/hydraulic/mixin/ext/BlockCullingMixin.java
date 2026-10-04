@@ -14,6 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class BlockCullingMixin {
     @Inject(method = "convertComponents", at = @At("RETURN"), cancellable = true)
     private static void hydraulic$cullSolidFaces(CustomBlockComponents components, CallbackInfoReturnable<NbtMap> cir) {
+        if (!org.geysermc.hydraulic.HydraulicImpl.instance().getConfig().siftFaceCulling()) return;
         if (components == null || components.geometry() == null) return;
         String id = components.geometry().identifier();
         if (!id.equals(StructureGeometry.IDENTIFIER) && !id.startsWith("geometry.the_sift.")) return;
