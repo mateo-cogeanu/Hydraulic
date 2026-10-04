@@ -47,9 +47,10 @@ public final class TrafficDiagnostics {
             int requested = session.getClientRenderDistance() != -1 ? session.getClientRenderDistance() : session.getServerRenderDistance();
             int effective = requested == -1 ? 2 : requested;
             if (client != null) effective = MobileViewDistance.limit(effective, client.getDeviceOs().name());
-            LOGGER.info("Hydraulic traffic: client={} protocol={} dimension={} requestedView={} javaViewRequest={} {}",
+            LOGGER.info("Hydraulic traffic: client={} protocol={} dimension={} requestedView={} javaViewRequest={} entityAppearance={} {}",
                     client == null ? "unknown" : client.getGameVersion(), session.getUpstream().getProtocolVersion(),
-                    session.getDimensionType(), requested, effective, report);
+                    session.getDimensionType(), requested, effective,
+                    org.geysermc.hydraulic.HydraulicImpl.instance().getConfig().customEntityAppearances() ? "custom" : "vanilla-proxy", report);
         }
     }
     public void error(org.geysermc.geyser.session.GeyserSession session, org.geysermc.mcprotocollib.network.event.session.PacketErrorEvent event) {

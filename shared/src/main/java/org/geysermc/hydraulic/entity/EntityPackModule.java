@@ -13,6 +13,7 @@ import org.geysermc.geyser.api.event.bedrock.SessionDisconnectEvent;
 import org.geysermc.hydraulic.pack.PackModule;
 import org.geysermc.hydraulic.pack.context.PackPostProcessContext;
 import org.geysermc.hydraulic.platform.mod.ModInfo;
+import org.geysermc.hydraulic.HydraulicImpl;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -54,6 +55,12 @@ public class EntityPackModule extends PackModule<EntityPackModule> {
             }
         });
         listenOn(GeyserDefineEntitiesEvent.class, context -> {
+            if (!HydraulicImpl.instance().getConfig().customEntityAppearances()) {
+                if (PROFILES.values().stream().anyMatch(profile -> profile.identifier().startsWith(context.mod().namespace() + ":"))) {
+                    context.logger().warn("Hydraulic entity isolation: {} mobs use vanilla proxy appearances; custom definitions, models and animations are omitted", context.mod().id());
+                }
+                return;
+            }
             int count = 0;
             for (Profile profile : PROFILES.values()) {
                 if (!profile.identifier().startsWith(context.mod().namespace() + ":") || profile.proxy() == EntityTypes.SNOWBALL) continue;
@@ -70,6 +77,7 @@ public class EntityPackModule extends PackModule<EntityPackModule> {
 
     @org.geysermc.event.subscribe.Subscribe
     public void onSpawn(ServerSpawnEntityEvent event) {
+        if (!HydraulicImpl.instance().getConfig().customEntityAppearances()) return;
         Profile profile = TRACKED.getOrDefault(event.connection().javaUuid(), Map.of()).get(event.entityId());
         if (profile == null) return;
         var definition = DEFINITIONS.get(profile.identifier());
@@ -92,6 +100,7 @@ public class EntityPackModule extends PackModule<EntityPackModule> {
     }
 
     private void postProcess(PackPostProcessContext<EntityPackModule> context) {
+        if (!HydraulicImpl.instance().getConfig().customEntityAppearances()) return;
         for (Profile profile : PROFILES.values()) {
             if (!profile.identifier().startsWith(context.mod().namespace() + ":") || profile.proxy() == EntityTypes.SNOWBALL) continue;
             String name = profile.identifier().split(":")[1];

@@ -99,8 +99,12 @@ public class BridgeSmoke implements ModInitializer {
                             public void setCancelled(boolean value) {}
                         };
                         org.geysermc.geyser.GeyserImpl.getInstance().eventBus().fire(spawn);
-                        if (selected.get() == null || !selected.get().identifier().toString().equals(entry.getValue().identifier())) throw new AssertionError("Custom appearance not selected: " + entry.getValue().identifier());
-                        appearances++;
+                        if (org.geysermc.hydraulic.HydraulicImpl.instance().getConfig().customEntityAppearances()) {
+                            if (selected.get() == null || !selected.get().identifier().toString().equals(entry.getValue().identifier())) throw new AssertionError("Custom appearance not selected: " + entry.getValue().identifier());
+                            appearances++;
+                        } else if (selected.get() != null) {
+                            throw new AssertionError("Custom appearance selected during vanilla isolation");
+                        }
                     }
                     var values = List.<SynchedEntityData.DataValue<?>>of(new SynchedEntityData.DataValue<>(0, EntityDataSerializers.BYTE, (byte)0), new SynchedEntityData.DataValue<>(30, EntityDataSerializers.INT, 99));
                     var metadata = (ClientboundSetEntityDataPacket) NativePacketBridge.remap(new ClientboundSetEntityDataPacket(id, values), player, null);

@@ -82,7 +82,8 @@ public class PackManager {
 
     public java.util.UUID packIdentity(ModInfo mod) {
         return packIdentities.computeIfAbsent(mod, input -> PackIdentity.of(
-                org.geysermc.hydraulic.util.PackUtil.getModUUID(input.roots()), converterIdentity));
+                org.geysermc.hydraulic.util.PackUtil.getModUUID(input.roots()), converterIdentity,
+                hydraulic.getConfig().customEntityAppearances()));
     }
 
     private List<ConverterPipeline<?, ?>> packConverters;

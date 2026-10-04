@@ -8,4 +8,9 @@ public final class PackIdentity {
     public static UUID of(UUID modContent, UUID converterContent) {
         return UUID.nameUUIDFromBytes(("hydraulic-pack-v2:" + modContent + ":" + converterContent).getBytes(StandardCharsets.UTF_8));
     }
+
+    public static UUID of(UUID modContent, UUID converterContent, boolean customEntityAppearances) {
+        UUID normal = of(modContent, converterContent);
+        return customEntityAppearances ? normal : UUID.nameUUIDFromBytes((normal + ":vanilla-entity-isolation").getBytes(StandardCharsets.UTF_8));
+    }
 }

@@ -7,6 +7,11 @@ import java.util.List;
 
 @ConfigSerializable
 public interface HydraulicConfig {
+    @Comment("Use converted custom mob appearances. Set false and restart to test with vanilla mob appearances; server mob behavior is preserved.")
+    default boolean customEntityAppearances() {
+        return true;
+    }
+
     @Comment("Mods that should be ignored")
     default List<String> ignoredMods() {
         return List.of("this-example-mod-id-should-be-ignored",
