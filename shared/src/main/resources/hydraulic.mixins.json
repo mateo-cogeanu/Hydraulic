@@ -14,6 +14,7 @@
     "ext.ModTranslationsMixin",
     "ext.BlockCullingMixin",
     "ext.SessionTrafficMixin",
+    "ext.MobileViewDistanceMixin",
     "ext.PacketErrorDiagnosticsMixin",
     "NativePacketsMixin"
   ],

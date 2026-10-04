@@ -29,6 +29,35 @@ public class BridgeSmoke implements ModInitializer {
                 if (!org.geysermc.hydraulic.compat.SessionTrafficAccess.class.isAssignableFrom(org.geysermc.geyser.session.GeyserSession.class)) throw new AssertionError("Session traffic mixin missing");
                 Class.forName("org.geysermc.geyser.session.GeyserSessionAdapter");
                 System.out.println("HYDRAULIC TRAFFIC MIXIN SMOKE PASS: upstream and decode diagnostic hooks applied.");
+                // Allocate a field-only fixture; no network session is opened by this unshipped probe.
+                var unsafeField = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+                unsafeField.setAccessible(true);
+                var unsafe = (sun.misc.Unsafe) unsafeField.get(null);
+                var sessionClass = org.geysermc.geyser.session.GeyserSession.class;
+                var sessionFixture = unsafe.allocateInstance(sessionClass);
+                var clientField = sessionClass.getDeclaredField("clientData");
+                var viewField = sessionClass.getDeclaredField("clientRenderDistance");
+                var serverViewField = sessionClass.getDeclaredField("serverRenderDistance");
+                var renderMethod = sessionClass.getDeclaredMethod("getRenderDistance");
+                for (var field : java.util.List.of(clientField, viewField, serverViewField)) field.setAccessible(true);
+                renderMethod.setAccessible(true);
+                var clientFixture = new org.geysermc.geyser.session.auth.BedrockClientData();
+                var osField = clientFixture.getClass().getDeclaredField("deviceOs");
+                osField.setAccessible(true);
+                clientField.set(sessionFixture, clientFixture);
+                viewField.setInt(sessionFixture, 8);
+                for (var os : org.geysermc.floodgate.util.DeviceOs.values()) {
+                    osField.set(clientFixture, os);
+                    int expected = os == org.geysermc.floodgate.util.DeviceOs.IOS || os == org.geysermc.floodgate.util.DeviceOs.GOOGLE || os == org.geysermc.floodgate.util.DeviceOs.AMAZON ? 4 : 8;
+                    if ((int) renderMethod.invoke(sessionFixture) != expected) throw new AssertionError("Incorrect view for " + os);
+                }
+                osField.set(clientFixture, org.geysermc.floodgate.util.DeviceOs.IOS);
+                viewField.setInt(sessionFixture, -1);
+                serverViewField.setInt(sessionFixture, 16);
+                if ((int) renderMethod.invoke(sessionFixture) != 4) throw new AssertionError("Login server view not capped");
+                serverViewField.setInt(sessionFixture, -1);
+                if ((int) renderMethod.invoke(sessionFixture) != 2) throw new AssertionError("Initial view changed");
+                System.out.println("HYDRAULIC MOBILE VIEW SMOKE PASS: live Geyser mixin caps all three mobile OS types, preserves other platforms and handles login defaults.");
                 int entities = 0, appearances = 0, sounds = 0;
                 if (NativePacketBridge.MOD_PARTICLES_ENABLED) throw new AssertionError("Diagnostic particles unexpectedly enabled");
                 int filteredParticles = 0;

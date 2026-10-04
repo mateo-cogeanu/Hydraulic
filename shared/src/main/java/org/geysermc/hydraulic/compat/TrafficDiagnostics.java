@@ -42,8 +42,15 @@ public final class TrafficDiagnostics {
             try { bytes = buffer.readableBytes(); } finally { buffer.release(); }
         }
         String report = record(direction, packet.getClass().getSimpleName(), bytes, System.nanoTime());
-        if (report != null) LOGGER.info("Hydraulic traffic: client={} protocol={} dimension={} {}", session.getClientData() == null ? "unknown" : session.getClientData().getGameVersion(),
-                session.getUpstream().getProtocolVersion(), session.getDimensionType(), report);
+        if (report != null) {
+            var client = session.getClientData();
+            int requested = session.getClientRenderDistance() != -1 ? session.getClientRenderDistance() : session.getServerRenderDistance();
+            int effective = requested == -1 ? 2 : requested;
+            if (client != null) effective = MobileViewDistance.limit(effective, client.getDeviceOs().name());
+            LOGGER.info("Hydraulic traffic: client={} protocol={} dimension={} requestedView={} javaViewRequest={} {}",
+                    client == null ? "unknown" : client.getGameVersion(), session.getUpstream().getProtocolVersion(),
+                    session.getDimensionType(), requested, effective, report);
+        }
     }
     public void error(org.geysermc.geyser.session.GeyserSession session, org.geysermc.mcprotocollib.network.event.session.PacketErrorEvent event) {
         if (error()) LOGGER.error("Hydraulic decode diagnostic: packet=" + (event.getPacketClass() == null ? "unknown" : event.getPacketClass().getName()), event.getCause());
