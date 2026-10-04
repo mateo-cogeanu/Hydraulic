@@ -17,9 +17,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Convert mod registry entries before MCProtocolLib decodes its vanilla-only enums. */
 public final class NativePacketBridge {
-    // Diagnostic default while investigating sustained Bedrock phone slowdown.
-    // Opt back in with -Dhydraulic.bedrock.mod-particles=true once stability is verified.
-    public static final boolean MOD_PARTICLES_ENABLED = Boolean.getBoolean("hydraulic.bedrock.mod-particles");
     public static final Map<UUID, ParticleBudget> PARTICLE_BUDGETS = new ConcurrentHashMap<>();
     public static final Set<String> PARTICLES = ConcurrentHashMap.newKeySet();
 
@@ -40,17 +37,25 @@ public final class NativePacketBridge {
             var profile = EntityPackModule.PROFILES.get(entity.getType());
             if (profile == null) return packet;
             EntityPackModule.TRACKED.computeIfAbsent(owner, ignored -> new ConcurrentHashMap<>()).put(entity.getId(), profile);
+            var nativeEntity = player.level().getEntity(entity.getId());
+            if (nativeEntity != null) org.geysermc.hydraulic.entity.SiftAnimationBridge.capture(owner, nativeEntity, profile.identifier(), session);
             return new ClientboundAddEntityPacket(entity.getId(), entity.getUUID(), entity.getX(), entity.getY(), entity.getZ(),
                     entity.getXRot(), entity.getYRot(), profile.proxy(), 0, entity.getMovement(), entity.getYHeadRot());
         }
         if (packet instanceof ClientboundSetEntityDataPacket metadata) {
             var profile = EntityPackModule.TRACKED.getOrDefault(owner, Map.of()).get(metadata.id());
-            if (profile != null) return new ClientboundSetEntityDataPacket(metadata.id(), metadata.packedItems().stream()
-                    .filter(value -> value.id() <= profile.metadataLimit()).toList());
+            if (profile != null) {
+                var nativeEntity = player.level().getEntity(metadata.id());
+                if (nativeEntity != null) org.geysermc.hydraulic.entity.SiftAnimationBridge.capture(owner, nativeEntity, profile.identifier(), session);
+                var values = metadata.packedItems().stream().filter(value -> value.id() <= profile.metadataLimit()).toList();
+                return values.isEmpty() ? null : new ClientboundSetEntityDataPacket(metadata.id(), values);
+            }
         }
         if (packet instanceof ClientboundRemoveEntitiesPacket remove) {
             var tracked = EntityPackModule.TRACKED.get(owner);
             if (tracked != null) remove.entityIds().forEach((int id) -> tracked.remove(id));
+            var animations = org.geysermc.hydraulic.entity.SiftAnimationBridge.STATES.get(owner);
+            if (animations != null) remove.entityIds().forEach((int id) -> animations.remove(id));
         }
         if (packet instanceof ClientboundSoundPacket sound && !sound.getSound().value().location().getNamespace().equals("minecraft")) {
             // Direct holders encode the sound identifier, not an unrecognised mod registry index.
@@ -69,12 +74,12 @@ public final class NativePacketBridge {
         if (packet instanceof ClientboundLevelParticlesPacket particles) {
             String identifier = BuiltInRegistries.PARTICLE_TYPE.getKey(particles.particle().getType()).toString();
             if (!identifier.startsWith("minecraft:")) {
-                if (!MOD_PARTICLES_ENABLED || PortalPresentation.isPortalEffect(identifier)) return null;
                 if (PARTICLES.contains(identifier)) {
                     double dx = particles.x() - player.getX(), dy = particles.y() - player.getY(), dz = particles.z() - player.getZ();
-                    if (dx * dx + dy * dy + dz * dz > 24 * 24) return null;
-                    int count = PARTICLE_BUDGETS.computeIfAbsent(owner, ignored -> new ParticleBudget())
-                            .reserve(particles.count() == 0 ? 1 : particles.count(), System.nanoTime());
+                    String world = player.level().dimension().identifier().toString();
+                    if (MobileViewDistance.inSift(world) && dx * dx + dy * dy + dz * dz > 24 * 24) return null;
+                    int count = MobileViewDistance.particleCount(particles.count() == 0 ? 1 : particles.count(), world,
+                            PortalPresentation.isPortalEffect(identifier), PARTICLE_BUDGETS.computeIfAbsent(owner, ignored -> new ParticleBudget()), System.nanoTime());
                     var random = java.util.concurrent.ThreadLocalRandom.current();
                     for (int i = 0; i < count; i++) {
                         var position = Vector3f.from(particles.x() + random.nextGaussian() * particles.xDist(),
@@ -91,7 +96,8 @@ public final class NativePacketBridge {
                 String mode = below.getProperties().stream().filter(property -> property.getName().equals("mode"))
                         .map(property -> below.getValue(property).toString().toLowerCase(Locale.ROOT)).findFirst().orElse("");
                 if (mode.equals("note") || mode.equals("horn")) {
-                    if (MOD_PARTICLES_ENABLED && mode.equals("note") && PARTICLE_BUDGETS.computeIfAbsent(owner, ignored -> new ParticleBudget()).reserve(1, System.nanoTime()) > 0) particle(session, "the_sift:sift_note", Vector3f.from(event.getPos().getX() + 0.5, event.getPos().getY() + 1.2, event.getPos().getZ() + 0.5));
+                    if (mode.equals("note") && MobileViewDistance.particleCount(1, player.level().dimension().identifier().toString(), false,
+                            PARTICLE_BUDGETS.computeIfAbsent(owner, ignored -> new ParticleBudget()), System.nanoTime()) > 0) particle(session, "the_sift:sift_note", Vector3f.from(event.getPos().getX() + 0.5, event.getPos().getY() + 1.2, event.getPos().getZ() + 0.5));
                     // Sift's server sends the actual custom sound separately. Avoid Bedrock's
                     // automatic vanilla instrument sound for this same block event.
                     return null;
@@ -102,7 +108,7 @@ public final class NativePacketBridge {
     }
 
     private static void particle(GeyserSession session, String identifier, Vector3f position) {
-        if (session.isClosed()) return;
+        if (session == null || session.isClosed()) return;
         session.executeInEventLoop(() -> {
             if (session.isClosed()) return;
             SpawnParticleEffectPacket effect = new SpawnParticleEffectPacket();

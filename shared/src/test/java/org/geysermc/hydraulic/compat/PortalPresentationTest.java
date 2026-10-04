@@ -3,6 +3,16 @@ import org.junit.jupiter.api.Test;
 import java.awt.image.BufferedImage;
 import static org.junit.jupiter.api.Assertions.*;
 class PortalPresentationTest {
+    @Test void animatedSkyStaysSmallOpaqueAndChangesBetweenFrames() {
+        var source = new BufferedImage(384, 256, BufferedImage.TYPE_INT_RGB);
+        var strip = PortalPresentation.animation(source);
+        assertEquals(32, strip.getWidth());
+        assertEquals(512, strip.getHeight());
+        assertFalse(strip.getColorModel().hasAlpha());
+        boolean differs = false;
+        for (int y = 0; y < 32; y++) for (int x = 0; x < 32; x++) differs |= strip.getRGB(x, y) != strip.getRGB(x, y + 32);
+        assertTrue(differs);
+    }
     @Test void shaderFallbackBecomesSmallOpaqueSquare() {
         var source = new BufferedImage(384, 256, BufferedImage.TYPE_INT_ARGB);
         source.setRGB(0, 0, 0x00123456);

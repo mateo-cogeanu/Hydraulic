@@ -46,7 +46,7 @@ public final class TrafficDiagnostics {
             var client = session.getClientData();
             int requested = session.getClientRenderDistance() != -1 ? session.getClientRenderDistance() : session.getServerRenderDistance();
             int effective = requested == -1 ? 2 : requested;
-            if (client != null) effective = MobileViewDistance.limit(effective, client.getDeviceOs().name());
+            effective = MobileViewDistance.forWorld(effective, String.valueOf(session.getWorldName()));
             LOGGER.info("Hydraulic traffic: client={} protocol={} dimension={} requestedView={} javaViewRequest={} entityAppearance={} {}",
                     client == null ? "unknown" : client.getGameVersion(), session.getUpstream().getProtocolVersion(),
                     session.getDimensionType(), requested, effective,

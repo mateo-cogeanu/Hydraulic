@@ -87,6 +87,13 @@ public class EntityPackModule extends PackModule<EntityPackModule> {
             entity.override(GeyserEntityDataTypes.WIDTH, profile.width());
             entity.override(GeyserEntityDataTypes.HEIGHT, profile.height());
             entity.override(GeyserEntityDataTypes.SCALE, profile.scale());
+            var state = SiftAnimationBridge.STATES.getOrDefault(event.connection().javaUuid(), Map.of()).get(event.entityId());
+            if (state != null) {
+                entity.override(GeyserEntityDataTypes.VARIANT, state.phase());
+                if (event.connection() instanceof org.geysermc.geyser.session.GeyserSession session) {
+                    session.executeInEventLoop(() -> { if (!session.isClosed()) SiftAnimationBridge.send(session, entity.geyserId(), state); });
+                }
+            }
         });
     }
 
@@ -95,6 +102,7 @@ public class EntityPackModule extends PackModule<EntityPackModule> {
         UUID uuid = event.connection().javaUuid();
         if (uuid != null) {
             TRACKED.remove(uuid);
+            SiftAnimationBridge.STATES.remove(uuid);
             org.geysermc.hydraulic.compat.NativePacketBridge.PARTICLE_BUDGETS.remove(uuid);
         }
     }
@@ -135,6 +143,11 @@ public class EntityPackModule extends PackModule<EntityPackModule> {
                     if (idle != null) animate.add(GSON.toJsonTree(Map.of(idle, walk == null ? "1.0" : "query.modified_move_speed < 0.01")));
                     if (walk != null) animate.add(GSON.toJsonTree(Map.of(walk, "query.modified_move_speed >= 0.01")));
                     description.add("scripts", GSON.toJsonTree(Map.of("animate", animate)));
+                    if (SiftAnimationControllers.supports(name) && context.mod().namespace().equals("the_sift")) {
+                        SiftAnimationControllers.configure(description, animations, name, "animation.hydraulic.the_sift." + name);
+                        context.bedrockResourcePack().addExtraFile(animations, "animations/" + name + ".animation.json");
+                        context.bedrockResourcePack().addExtraFile(SiftAnimationControllers.controller(name), "animation_controllers/" + name + ".json");
+                    }
                 }
                 context.bedrockResourcePack().addExtraFile(GSON.toJsonTree(Map.of("format_version", "1.10.0", "minecraft:client_entity", Map.of("description", description))), "entity/" + name + ".entity.json");
             } catch (Exception e) {

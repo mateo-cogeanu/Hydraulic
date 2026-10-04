@@ -13,6 +13,7 @@ public class ConfigLoader {
     private static final ConfigurationTransformation.Versioned TRANSFORMER = ConfigurationTransformation.versionedBuilder()
         .versionKey("config-version")
         .addVersion(1, ConfigurationTransformation.builder().build())
+        .addVersion(2, ConfigurationTransformation.builder().build())
         .build();
 
     public static HydraulicConfig loadConfig(File configFile) throws ConfigurateException {
@@ -22,6 +23,8 @@ public class ConfigLoader {
         boolean originallyEmpty = !configFile.exists() || node.isNull();
 
         int currentVersion = TRANSFORMER.version(node);
+        // End the temporary vanilla-entity comparison when upgrading the preview.
+        if (currentVersion < 2) node.node("custom-entity-appearances").set(true);
         TRANSFORMER.apply(node);
         int newVersion = TRANSFORMER.version(node);
 

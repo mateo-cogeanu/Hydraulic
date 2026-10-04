@@ -67,7 +67,7 @@ with ZipFile(sys.argv[1]) as pack:
     import struct
     bitmap = pack.read('textures/hydraulic/the_sift/portal.png')
     assert bitmap.startswith(b'\x89PNG')
-    assert struct.unpack('>II', bitmap[16:24]) == (32, 32)
+    assert struct.unpack('>II', bitmap[16:24]) == (32, 512)
     culling = json.loads(pack.read('block_culling/hydraulic_solid_cube.json'))['minecraft:block_culling_rules']
     assert culling['description']['identifier'] == 'hydraulic:solid_cube'
     assert len(culling['rules']) == 6
@@ -77,12 +77,19 @@ with ZipFile(sys.argv[1]) as pack:
     manifest = json.loads(pack.read('manifest.json'))
     assert manifest['header']['min_engine_version'] >= [1, 26, 0]
     flipbooks = json.loads(pack.read('textures/flipbook_textures.json'))
-    assert len(flipbooks) == 2
+    assert len(flipbooks) == 3
     for flipbook in flipbooks:
         bitmap = pack.read(flipbook['flipbook_texture'] + '.png')
-        assert struct.unpack('>II', bitmap[16:24]) == (32, 1024)
-        assert flipbook['ticks_per_frame'] == 10
+        portal = flipbook['flipbook_texture'].endswith('/portal')
+        assert struct.unpack('>II', bitmap[16:24]) == ((32, 512) if portal else (32, 1024))
+        assert flipbook['ticks_per_frame'] == (3 if portal else 10)
     terrain = json.loads(pack.read('textures/terrain_texture.json'))['texture_data']
+    for definition in terrain.values():
+        textures = definition['textures']
+        if isinstance(textures, (str, dict)): textures = [textures]
+        for texture in textures:
+            if isinstance(texture, dict): texture = texture['path']
+            assert texture + '.png' in names, f'Missing terrain texture: {texture}'
     assert 'hydraulic_sift_portal' in terrain
     assert 'textures/hydraulic/the_sift/portal.png' in names
     entities = [name for name in names if name.startswith('entity/') and name.endswith('.json')]
@@ -91,13 +98,18 @@ with ZipFile(sys.argv[1]) as pack:
     for name in names:
         if name.startswith('animations/') and name.endswith('.json'):
             animations.update(json.loads(pack.read(name))['animations'])
+    controllers = {}
+    for name in names:
+        if name.startswith("animation_controllers/") and name.endswith(".json"):
+            controllers.update(json.loads(pack.read(name))["animation_controllers"])
+    assert len(controllers) == 3
     for name in entities:
         description = json.loads(pack.read(name))['minecraft:client_entity']['description']
         geometry = description['geometry']['default']
         assert geometry in geometries or geometry in {'geometry.sniffer', 'geometry.boat', 'geometry.chest_boat'}, name
         assert description['textures']['default'] + '.png' in names, name
         for animation in description.get('animations', {}).values():
-            assert animation in animations, f'Missing entity animation: {animation}'
+            assert animation in animations or animation in controllers, f'Missing entity animation: {animation}'
     particles = [name for name in names if name.startswith('particles/') and name.endswith('.json')]
     assert len(particles) == 10
     for name in particles:

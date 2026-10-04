@@ -21,6 +21,6 @@ public interface HydraulicConfig {
     @Comment("Do not change!")
     @SuppressWarnings("unused")
     default int configVersion() {
-        return 1;
+        return 2;
     }
 }

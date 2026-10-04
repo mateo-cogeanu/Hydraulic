@@ -15,6 +15,7 @@
     "ext.BlockCullingMixin",
     "ext.SessionTrafficMixin",
     "ext.MobileViewDistanceMixin",
+    "ext.DimensionViewDistanceMixin",
     "ext.PacketErrorDiagnosticsMixin",
     "NativePacketsMixin"
   ],

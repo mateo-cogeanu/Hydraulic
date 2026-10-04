@@ -10,7 +10,6 @@ import org.spongepowered.asm.mixin.injection.At;
 public class MobileViewDistanceMixin {
     @ModifyReturnValue(method = "getRenderDistance", at = @At("RETURN"))
     private int hydraulic$limitMobileServerView(int requested) {
-        var client = ((GeyserSession) (Object) this).getClientData();
-        return client == null ? requested : MobileViewDistance.limit(requested, client.getDeviceOs().name());
+        return MobileViewDistance.forWorld(requested, String.valueOf(((GeyserSession) (Object) this).getWorldName()));
     }
 }

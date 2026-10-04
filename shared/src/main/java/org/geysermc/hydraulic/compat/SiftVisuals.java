@@ -25,11 +25,14 @@ public class SiftVisuals extends PackModule<SiftVisuals> {
                 var image = context.mod().resolveFile("assets/the_sift/textures/misc/sift_portal_shaderpack.png");
                 if (image == null) image = context.mod().resolveFile("assets/the_sift/textures/block/sift_portal_mist.png");
                 java.awt.image.BufferedImage portal;
-                try (var input = Files.newInputStream(image)) { portal = PortalPresentation.texture(ImageIO.read(input)); }
+                try (var input = Files.newInputStream(image)) { portal = PortalPresentation.animation(ImageIO.read(input)); }
                 var encoded = new java.io.ByteArrayOutputStream();
                 ImageIO.write(portal, "png", encoded);
                 pack.addExtraFile(encoded.toByteArray(), "textures/hydraulic/the_sift/portal.png");
                 pack.addBlockTexture("hydraulic_sift_portal", "textures/hydraulic/the_sift/portal");
+                pack.addFlipbookTexture("hydraulic_sift_portal", "textures/hydraulic/the_sift/portal", PortalPresentation.TICKS_PER_FRAME);
+                pack.addExtraFile(GSON.toJsonTree(Map.of("format_version", "1.16.100", "minecraft:texture_set", Map.of(
+                        "color", "portal", "metalness_emissive_roughness", List.of(0, 255, 255)))), "textures/hydraulic/the_sift/portal.texture_set.json");
                 pack.addExtraFile(org.geysermc.hydraulic.block.StructureGeometry.culling(), "block_culling/hydraulic_solid_cube.json");
                 for (String identifier : NativePacketBridge.PARTICLES) {
                     String name = identifier.split(":")[1];

@@ -38,18 +38,23 @@ public class BridgeSmoke implements ModInitializer {
                 var clientField = sessionClass.getDeclaredField("clientData");
                 var viewField = sessionClass.getDeclaredField("clientRenderDistance");
                 var serverViewField = sessionClass.getDeclaredField("serverRenderDistance");
+                var worldField = sessionClass.getDeclaredField("worldName");
                 var renderMethod = sessionClass.getDeclaredMethod("getRenderDistance");
-                for (var field : java.util.List.of(clientField, viewField, serverViewField)) field.setAccessible(true);
+                for (var field : java.util.List.of(clientField, viewField, serverViewField, worldField)) field.setAccessible(true);
                 renderMethod.setAccessible(true);
                 var clientFixture = new org.geysermc.geyser.session.auth.BedrockClientData();
                 var osField = clientFixture.getClass().getDeclaredField("deviceOs");
                 osField.setAccessible(true);
                 clientField.set(sessionFixture, clientFixture);
                 viewField.setInt(sessionFixture, 8);
+                worldField.set(sessionFixture, net.kyori.adventure.key.Key.key("the_sift:the_sift"));
                 for (var os : org.geysermc.floodgate.util.DeviceOs.values()) {
                     osField.set(clientFixture, os);
-                    int expected = os == org.geysermc.floodgate.util.DeviceOs.IOS || os == org.geysermc.floodgate.util.DeviceOs.GOOGLE || os == org.geysermc.floodgate.util.DeviceOs.AMAZON ? 4 : 8;
+                    int expected = 4;
                     if ((int) renderMethod.invoke(sessionFixture) != expected) throw new AssertionError("Incorrect view for " + os);
+                    worldField.set(sessionFixture, net.kyori.adventure.key.Key.key("minecraft:overworld"));
+                    if ((int) renderMethod.invoke(sessionFixture) != 8) throw new AssertionError("Overworld still limited");
+                    worldField.set(sessionFixture, net.kyori.adventure.key.Key.key("the_sift:the_sift"));
                 }
                 osField.set(clientFixture, org.geysermc.floodgate.util.DeviceOs.IOS);
                 viewField.setInt(sessionFixture, -1);
@@ -57,9 +62,9 @@ public class BridgeSmoke implements ModInitializer {
                 if ((int) renderMethod.invoke(sessionFixture) != 4) throw new AssertionError("Login server view not capped");
                 serverViewField.setInt(sessionFixture, -1);
                 if ((int) renderMethod.invoke(sessionFixture) != 2) throw new AssertionError("Initial view changed");
-                System.out.println("HYDRAULIC MOBILE VIEW SMOKE PASS: live Geyser mixin caps all three mobile OS types, preserves other platforms and handles login defaults.");
+                System.out.println("HYDRAULIC MOBILE VIEW SMOKE PASS: live Geyser mixin caps the Sift on every Bedrock OS, restores Overworld distance and handles login defaults.");
                 int entities = 0, appearances = 0, sounds = 0;
-                if (NativePacketBridge.MOD_PARTICLES_ENABLED) throw new AssertionError("Diagnostic particles unexpectedly enabled");
+                Class.forName("org.geysermc.geyser.translator.protocol.java.JavaRespawnTranslator");
                 int filteredParticles = 0;
                 for (var particleType : BuiltInRegistries.PARTICLE_TYPE) {
                     if (!BuiltInRegistries.PARTICLE_TYPE.getKey(particleType).getNamespace().equals("the_sift")) continue;
@@ -70,7 +75,7 @@ public class BridgeSmoke implements ModInitializer {
                     }
                 }
                 if (filteredParticles != 10) throw new AssertionError("Expected ten filtered mod particles: " + filteredParticles);
-                System.out.println("HYDRAULIC PARTICLE FILTER SMOKE PASS: ten 10,000-effect bursts suppressed without upstream work.");
+                System.out.println("HYDRAULIC PARTICLE FILTER SMOKE PASS: ten mod particle packets safely intercepted without vanilla registry decoding.");
                 Class.forName("net.minecraft.server.network.ServerCommonPacketListenerImpl");
                 for (var entry : EntityPackModule.PROFILES.entrySet()) {
                     int id = 1234 + entities;
@@ -164,6 +169,35 @@ public class BridgeSmoke implements ModInitializer {
                     if (!java.util.Set.of("the_sift:ichor_glass", "the_sift:ichor_glass_pane", "the_sift:ichor_cauldron").contains(block.identifier()) && methods.contains("blend")) throw new AssertionError("Unexpected blended block " + block.identifier());
                     System.out.println("HYDRAULIC RENDER AUDIT " + block.identifier() + " " + methods + " presentations=" + presentations.size());
                 }
+                int solidMappings = 0;
+                for (var state : net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY) {
+                    if (!BuiltInRegistries.BLOCK.getKey(state.getBlock()).getNamespace().equals("the_sift")) continue;
+                    if (state.getRenderShape() == net.minecraft.world.level.block.RenderShape.INVISIBLE) continue;
+                    for (var palette : org.geysermc.geyser.registry.BlockRegistries.BLOCKS.get().values()) {
+                        int id = org.geysermc.hydraulic.block.JavaBlockStateRemapper.translate(net.minecraft.world.level.block.Block.getId(state));
+                        if (palette.getBedrockBlockId(id) == palette.getBedrockAir().getRuntimeId()) throw new AssertionError("Visible Sift state mapped to air: " + state);
+                        solidMappings++;
+                    }
+                }
+                System.out.println("HYDRAULIC VISIBLE STATE AUDIT PASS: " + solidMappings + " native Sift state/palette lookups are visible.");
+                for (var entry : EntityPackModule.PROFILES.entrySet()) {
+                    if (!java.util.Set.of("the_sift:singer", "the_sift:rift", "the_sift:mini_rift").contains(entry.getValue().identifier())) continue;
+                    var actor = entry.getKey().create(server.overworld(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+                    if (org.geysermc.hydraulic.entity.SiftAnimationBridge.read(actor, entry.getValue().identifier()) == null) throw new AssertionError("Native animation reflection failed");
+                    if (entry.getValue().identifier().equals("the_sift:singer")) {
+                        actor.getClass().getMethod("beginSequence").invoke(actor);
+                        var state = org.geysermc.hydraulic.entity.SiftAnimationBridge.read(actor, entry.getValue().identifier());
+                        if (state.phase() != 2 || state.tick() != 0) throw new AssertionError("Singer appear sequence not captured: " + state);
+                        var field = actor.getClass().getDeclaredField("DATA_SEQUENCE_TICK"); field.setAccessible(true);
+                        var accessor = (net.minecraft.network.syncher.EntityDataAccessor<Integer>) field.get(null);
+                        actor.getEntityData().set(accessor, 148);
+                        if (org.geysermc.hydraulic.entity.SiftAnimationBridge.read(actor, entry.getValue().identifier()).phase() != 3) throw new AssertionError("Singer sing sequence missing");
+                        actor.getEntityData().set(accessor, 309);
+                        if (org.geysermc.hydraulic.entity.SiftAnimationBridge.read(actor, entry.getValue().identifier()).phase() != 4) throw new AssertionError("Singer disappear sequence missing");
+                    }
+                    actor.discard();
+                }
+                System.out.println("HYDRAULIC SEQUENCE SMOKE PASS: actual Sift Singer, Rift and Mini Rift synchronized state read successfully.");
                 int frameBlocks = 0;
                 for (var block : org.geysermc.geyser.registry.BlockRegistries.CUSTOM_BLOCKS.get()) {
                     if (org.geysermc.hydraulic.block.StructureGeometry.isSiftSolidCube(block.identifier())) {
@@ -189,6 +223,7 @@ public class BridgeSmoke implements ModInitializer {
                         String id = components.geometry().identifier();
                         if (block.identifier().equals("the_sift:sift_portal")) {
                             if (!id.equals(org.geysermc.hydraulic.compat.PortalPresentation.GEOMETRY)) throw new AssertionError("Portal is not a built-in cube");
+                            if (components.lightEmission() != 15) throw new AssertionError("Portal not luminous");
                             if (!components.materialInstances().get("*").renderMethod().equals("opaque")) throw new AssertionError("Portal is translucent");
                             System.out.println("HYDRAULIC PORTAL SMOKE PASS: built-in opaque full block.");
                         }
