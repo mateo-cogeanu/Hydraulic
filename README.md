@@ -23,6 +23,26 @@ you're interested in helping out with Hydraulic.
 4. The project should import into your IDE after the loom setup is complete. For more detailed information, see the [Fabric setup](https://docs.fabricmc.net/develop/getting-started/setting-up).
 5. Use `./gradlew build` to compile a jar file, or use `./gradlew :fabric:runServer` to run a server with Hydraulic installed. Make sure you have Geyser in your `mods` folder along with Hydraulic!
 
+## Building this Minecraft 26.3 fork
+
+Use Java 25. This branch targets Fabric Loader 0.19.5 or newer and Fabric API
+0.161.0+26.3. Install `hydraulic-fabric.jar` with the matching Geyser-Fabric,
+Floodgate-Fabric, and Fabric API JARs on a Minecraft 26.3 server.
+
+Hydraulic compiles against the matching Geyser fork rather than the 26.2 release.
+Check out `mateo-cogeanu/Geyser` on `codex/fabric-26.3` and run:
+
+```sh
+./gradlew :api:publishToMavenLocal :common:publishToMavenLocal :core:publishToMavenLocal :mod:publishToMavenLocal :fabric:publishToMavenLocal
+```
+
+Then run `./gradlew build` in this Hydraulic checkout. The local Geyser artifacts
+use version `preview-codex-fabric-26.3-SNAPSHOT`.
+
+Minecraft 26.3 tools and signs are classified through item tags. Custom axes,
+hoes, shovels, and signs should belong to their corresponding vanilla item tags
+to receive the matching Bedrock creative group.
+
 ## Links:
 - Website: https://geysermc.org
 - Docs: https://geysermc.org/wiki/other/hydraulic

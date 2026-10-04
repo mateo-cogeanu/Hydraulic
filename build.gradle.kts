@@ -22,7 +22,9 @@ allprojects {
     }
 
     repositories {
-        // mavenLocal()
+        mavenLocal {
+            content { includeGroup("org.geysermc.geyser") }
+        }
         mavenCentral()
 
         // Geyser, Floodgate, Cumulus etc.
