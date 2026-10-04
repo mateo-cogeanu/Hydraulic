@@ -301,7 +301,7 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                     String geoKey = value.substring(value.lastIndexOf('/') + 1);
                     String geoName = "geometry." + (namespace.equals(Key.MINECRAFT_NAMESPACE) ? "" : namespace + ".") + geoKey;
 
-                    if (emptyModels.contains(key.toString())) {
+                    if (emptyModels.contains(key.toString()) && !blockLocation.toString().equals("the_sift:sift_portal")) {
                         context.logger().warn("Missing block model for block {}", blockLocation);
                         geoName = "geometry." + Constants.MOD_ID + ".empty";
                     }
@@ -396,6 +396,15 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                             .tintMethod(tintMethod)
                             .build());
                     context.logger().warn("Could not find material for block {}", key);
+                }
+
+                if (blockLocation.toString().equals("the_sift:sift_portal")) {
+                    componentsBuilder.geometry(GeometryComponent.builder().identifier("geometry.hydraulic.sift_portal").build());
+                    int rotation = state.getProperties().stream()
+                            .anyMatch(property -> property.getName().equals("axis") && propertyValue(state, property).equals("z")) ? 90 : 0;
+                    componentsBuilder.transformation(new TransformationComponent(0, rotation, 0, 1, 1, 1, 0, 0, 0));
+                    componentsBuilder.materialInstance("*", MaterialInstance.builder().texture("hydraulic_sift_portal")
+                            .renderMethod("blend").faceDimming(false).ambientOcclusion(false).build());
                 }
 
                 // No properties exist on this state, so there's only one

@@ -59,6 +59,7 @@ tasks {
     }
 
     shadowJar {
+        relocate("org.cloudburstmc.protocol", "org.geysermc.geyser.shaded.org.cloudburstmc.protocol")
         archiveClassifier.set("dev-shadow")
     }
 

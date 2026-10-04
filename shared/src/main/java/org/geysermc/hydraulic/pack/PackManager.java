@@ -94,6 +94,7 @@ public class PackManager {
         final Collection<ModInfo> mods = this.hydraulic.mods();
         final Map<String, List<ResourcePack>> modPacks = Maps.newHashMapWithExpectedSize(mods.size());
         for (final ModInfo mod : mods) {
+            org.geysermc.hydraulic.text.ModTranslations.load(mod, LOGGER);
             modPacks.put(
                 mod.id(),
                 mod.roots()

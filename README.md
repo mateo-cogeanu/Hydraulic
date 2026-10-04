@@ -52,4 +52,4 @@ to receive the matching Bedrock creative group.
 
 ### The Sift compatibility preview
 
-This branch adds reusable block, item, armor, and sound conversion fixes tested with Mielon's The Sift 1.1.2 on Fabric 26.3. Full Bedrock support is still in progress. See [the compatibility report](docs/sift-compatibility.md) for validation and remaining entity, fluid, portal, and client-rendering work.
+This branch adds block/item conversion fixes, explicit 3D armor, mod text translations, Sift portal/effect presentations and bridges for modded entities and sounds, tested with Mielon's The Sift 1.1.2 on Fabric 26.3. Full Bedrock support is still in progress. See [the compatibility report](docs/sift-compatibility.md) for validation and remaining special animations, fluids and client-rendering work.

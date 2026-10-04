@@ -10,7 +10,9 @@
     "ext.ModelSerializerMixin",
     "ext.ChunkBlockStatesMixin",
     "ext.BlockPacketsMixin",
-    "ext.WorldBlockStatesMixin"
+    "ext.WorldBlockStatesMixin",
+    "ext.ModTranslationsMixin",
+    "NativePacketsMixin"
   ],
   "injectors": {
     "defaultRequire": 1

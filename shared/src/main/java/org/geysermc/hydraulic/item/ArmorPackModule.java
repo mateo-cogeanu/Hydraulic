@@ -44,11 +44,6 @@ public class ArmorPackModule extends PackModule<ArmorPackModule> {
             put("enchanted", "armor_enchanted");
         }
     };
-    private static final Scripts ATTACHABLE_SCRIPTS = new Scripts();
-
-    static {
-        ATTACHABLE_SCRIPTS.parentSetup("variable.chest_layer_visible = 0.0;");
-    }
 
     public ArmorPackModule() {
         this.postProcess(this::postProcess);
@@ -121,7 +116,15 @@ public class ArmorPackModule extends PackModule<ArmorPackModule> {
             Description description = new Description();
             description.identifier(armorItemLocation.toString());
             description.materials(ATTACHABLE_MATERIALS);
-            description.scripts(ATTACHABLE_SCRIPTS);
+            Scripts scripts = new Scripts();
+            scripts.parentSetup(switch (equippable.slot()) {
+                case HEAD -> "variable.helmet_layer_visible = 0.0;";
+                case CHEST -> "variable.chest_layer_visible = 0.0;";
+                case LEGS -> "variable.leg_layer_visible = 0.0;";
+                case FEET -> "variable.boot_layer_visible = 0.0;";
+                default -> "";
+            });
+            description.scripts(scripts);
             description.renderControllers(new String[] { "controller.render.armor" });
 
             description.item(Map.of(armorItemLocation.toString(), "query.owner_identifier == 'minecraft:player'"));
@@ -134,18 +137,10 @@ public class ArmorPackModule extends PackModule<ArmorPackModule> {
                 }
             });
 
-            String geometryType = "";
-            switch (layerType) {
-                case EquipmentLayerType.HUMANOID -> {
-                    switch (equippable.slot()) {
-                        case EquipmentSlot.HEAD -> geometryType = "geometry.player.armor.helmet";
-                        case EquipmentSlot.CHEST -> geometryType = "geometry.player.armor.chestplate";
-                        case EquipmentSlot.FEET -> geometryType = "geometry.player.armor.boots";
-                    }
-                }
-                case EquipmentLayerType.HUMANOID_LEGGINGS -> geometryType = "geometry.player.armor.leggings";
-                case EquipmentLayerType.HORSE_BODY -> {} // TODO: Handle adding horse armor, might need to PR geyser for the slot
-            }
+            String slot = equippable.slot().name().toLowerCase(Locale.ROOT);
+            if (!List.of("head", "chest", "legs", "feet").contains(slot)) continue;
+            String geometryType = "geometry.hydraulic.armor." + slot;
+            context.bedrockResourcePack().addExtraFile(ArmorGeometry.create(slot), "models/entity/hydraulic_armor_" + slot + ".geo.json");
 
             description.geometry(Map.of("default", geometryType));
 

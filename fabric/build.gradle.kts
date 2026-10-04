@@ -33,6 +33,8 @@ tasks {
 
     shadowJar {
         archiveClassifier.set("dev-shadow")
+        // Use the protocol classes supplied by Geyser, which shades Cloudburst.
+        relocate("org.cloudburstmc.protocol", "org.geysermc.geyser.shaded.org.cloudburstmc.protocol")
         relocate("org.spongepowered.configurate", "org.geysermc.hydraulic.shaded.org.spongepowered.configurate")
     }
 

@@ -52,5 +52,37 @@ with ZipFile(sys.argv[1]) as pack:
         for sound in definition.get('sounds', []):
             path = sound if isinstance(sound, str) else sound['name']
             assert path + '.ogg' in names, f'Missing sound: {path}'
+    geometries = {}
+    for name in names:
+        if name.startswith('models/') and name.endswith('.json'):
+            document = json.loads(pack.read(name))
+            for geometry in document.get('minecraft:geometry', []):
+                geometries[geometry['description']['identifier']] = geometry
+    for name in attachables:
+        description = json.loads(pack.read(name))['minecraft:attachable']['description']
+        assert description['geometry']['default'] in geometries, f'Missing armor geometry: {name}'
+    assert 'geometry.hydraulic.sift_portal' in geometries
+    terrain = json.loads(pack.read('textures/terrain_texture.json'))['texture_data']
+    assert 'hydraulic_sift_portal' in terrain
+    assert 'textures/hydraulic/the_sift/portal.png' in names
+    entities = [name for name in names if name.startswith('entity/') and name.endswith('.json')]
+    assert len(entities) == 9, f'Expected 9 entity appearances, found {len(entities)}'
+    animations = {}
+    for name in names:
+        if name.startswith('animations/') and name.endswith('.json'):
+            animations.update(json.loads(pack.read(name))['animations'])
+    for name in entities:
+        description = json.loads(pack.read(name))['minecraft:client_entity']['description']
+        geometry = description['geometry']['default']
+        assert geometry in geometries or geometry in {'geometry.sniffer', 'geometry.boat', 'geometry.chest_boat'}, name
+        assert description['textures']['default'] + '.png' in names, name
+        for animation in description.get('animations', {}).values():
+            assert animation in animations, f'Missing entity animation: {animation}'
+    particles = [name for name in names if name.startswith('particles/') and name.endswith('.json')]
+    assert len(particles) == 10
+    for name in particles:
+        description = json.loads(pack.read(name))['particle_effect']['description']
+        assert description['basic_render_parameters']['texture'] + '.png' in names, name
+    print(f'PASS: portal geometry/texture, {len(entities)} entity appearances, {len(animations)} animations, {len(particles)} effects')
     print(f'PASS: {len(icons)} item icons, {len(attachables)} armor attachables, '
           f'{len(multipart)} shared multipart geometries, {len(sounds)} sound events')
