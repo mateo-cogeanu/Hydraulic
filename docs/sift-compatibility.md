@@ -6,6 +6,7 @@ This branch includes a **compatibility preview**, tested with [The Sift 1.1.2](h
 
 The changes apply to other mods using the same resource formats; Hydraulic has no mandatory dependency on The Sift or GeckoLib.
 
+- Server block-state IDs are translated at the Geyser input boundary. Sift adds `ichorlogged` to vanilla blocks, shifting and expanding their IDs; matching vanilla states by name and known properties restores their original mappings. Chunk palettes, block updates, falling blocks, block particles/events, block-state entity metadata, and direct world reads use translated IDs. Registered custom states retain their IDs. Unconverted fluid states use a vanilla fluid presentation; unsupported mapping slots receive an air fallback.
 - Negative Java block hardness now produces an effectively unbreakable Bedrock component while retaining Java's `-1` mining hardness. Previously Sift's portal caused an exception that stopped registration of later blocks.
 - Item conversion follows `minecraft:item_model` and the model references in `assets/<namespace>/items`, including block-model paths. Static fallback models are selected for select/range definitions; inactive models are preferred for conditional definitions. Dynamic item appearances and composite item layers are not fully translated.
 - Multipart block conditions support nested AND/OR, unconditional pieces, alternatives, and negation. All matching pieces are exported with independent rotations and material names. States with identical presentations share geometry. Weighted alternatives still select the first variant, and multipart UV-lock correction remains unsupported.
@@ -17,9 +18,9 @@ The changes apply to other mods using the same resource formats; Hydraulic has n
 
 ## Verified
 
-A dedicated Fabric server starts with Hydraulic, Geyser, Floodgate, The Sift, GeckoLib, and Fabric API. Sift's dimension loads and its resource pack is generated. The startup registers 71 custom blocks (including Geyser's built-in entries) and 91 custom items; Sift contributes 64 blocks with blockstate files and 90 items. The updated run has no registration errors or missing item-model warnings. The pack audit verifies 47 item icons, four armor attachables, 507 shared multipart geometries, and 20 local sound events; another 29 events use vanilla sound mappings. Ten regression tests pass.
+A dedicated Fabric server starts with Hydraulic, Geyser, Floodgate, The Sift, GeckoLib, and Fabric API. Sift's dimension loads and its resource pack is generated. The startup registers 71 custom blocks (including Geyser's built-in entries) and 91 custom items; Sift contributes 64 blocks with blockstate files and 90 items. The updated run has no registration errors or missing item-model warnings. The pack audit verifies 47 item icons, four armor attachables, 507 shared multipart geometries, and 20 local sound events; another 29 events use vanilla sound mappings. Twenty-four regression tests pass.
 
-Regression tests cover block conditions, item references, equipment layer selection, and sound event aliases:
+Regression tests cover block conditions, item references, equipment layer selection, sound event aliases, state identity projection, all block palette types, block packets/metadata, and sparse mapping tables:
 
 ```sh
 ./gradlew :fabric:build :shared:test
@@ -31,9 +32,13 @@ The pack audit checks JSON validity, item texture paths, four armor attachables,
 ## Work remaining before full support
 
 - Translate modded Java entity types and metadata through Geyser, then export GeckoLib models, animations, textures and client entity definitions. The custom mobs, boats and rifts are not supported by these asset fixes.
-- Translate Ichor's fluid states and behavior. It has no blockstate JSON, so it is not covered by standard block conversion.
+- Translate Ichor's custom appearance and full fluid behavior. Its 16 states currently use corresponding vanilla water states because it has no standard blockstate JSON. Ichor logging on vanilla blocks is not represented faithfully.
 - Provide a Bedrock portal renderer. Sift's portal model only supplies a particle texture; the visible portal is rendered by Java client code and remains invisible with the current empty geometry fallback.
 - Adapt client-only dimension sky, weather, shaders, particles, custom networking and entity animation state. Java client code does not execute on Bedrock.
 - Validate progression, portal activation, dimension travel, mob interaction, crafting/smithing, equipment, inventories and audio with an actual Bedrock client.
 
 Use a separate test server/world for this preview. Install the Fabric GeckoLib artifact, not the NeoForge artifact linked by some dependency metadata.
+
+## Chunk-error regression (2026-10-04)
+
+The first user Bedrock test reported repeated `BlockMappings.getBedrockBlockId` null-pointer exceptions while loading chunks. A local registry audit reproduced missing mappings and showed that Sift also changes vanilla state IDs. The patch maps 62,323 shifted/expanded vanilla server states with zero unmatched vanilla states and maps 16 otherwise unconverted fluid states. Every server state was passed through the same Bedrock block-ID lookup used by chunk translation for all three supported palettes. Startup and pack audits pass. A separate server with the Hydraulic sample mod and no Sift also starts successfully, with zero shifted or unmatched vanilla states. The corrected build still needs the user to verify a real Bedrock connection.
