@@ -437,6 +437,13 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                             .renderMethod("opaque").faceDimming(false).ambientOcclusion(false).build());
                 }
 
+                // Bedrock must have a complete base presentation, including for blocks
+                // whose visual state is selected by permutations. Keep the default model
+                // as the base and let state-specific permutations override it.
+                if (state.equals(block.defaultBlockState())) {
+                    baseComponentBuilder = componentsBuilder;
+                }
+
                 // No properties exist on this state, so there's only one
                 // blockstate that can exist. Update the base builder so that
                 // the code that creates the component for the base block

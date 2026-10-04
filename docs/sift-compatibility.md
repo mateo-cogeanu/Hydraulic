@@ -166,8 +166,18 @@ An unshipped runtime audit serializes four actual Sift chunks around the portal 
 
 62 regression tests and fresh/cached server probes pass. Original mod files, Singer phases, custom entities, armor, effects and sounds remain. This is a targeted rendering repair based on the preceding client's improvement; remaining client terrain visibility and performance require a retest. Replace only Hydraulic, restart the server and accept the regenerated Bedrock resource pack.
 
-## Current diagnostic: isolate face culling (2026-10-04)
+## Earlier diagnostic: isolate face culling (2026-10-04)
 
 The user reports that the complete explicit-cube build looks unchanged. Therefore the remaining built-in references have not been established as the cause. This build adds an optional `sift-face-culling` setting, defaulting to `true`. To compare the same terrain without neighbor-face culling, stop the server, add `sift-face-culling: false` to `config/hydraulic/config.yml`, and restart. This changes only the culling component; geometry, textures, states, collisions, Singer phases and other content remain. Use Windows for the unculling comparison because rendering all covered faces can increase client memory and frame cost. Restore `true` after the comparison.
 
 The unshipped probe now verifies Bedrock block-palette serialization in addition to native section decoding/remapping: all 786,432 positions across four chunks and three palettes encode/decode exactly, including XZY coordinate conversion. This checks runtime IDs in block-storage payloads; it does not cover the client's renderer, occlusion mesh, resource-pack cache or the entire live session transport. Enabled/disabled culling startup checks verify that the toggle respectively includes/omits the culling component, with unchanged models and state coverage. This is a diagnostic comparison, not a claim that the terrain defect is fixed.
+
+## Current preview: complete base block presentations (2026-10-04)
+
+The user confirms that Siftslate is invisible even when newly placed, with face culling enabled or disabled. That result excludes the added neighbor-face culling component as a sufficient explanation. The Siftslate PNG is present and fully opaque.
+
+The exporter previously assigned model/material components to the base only when a block had no state properties. Blocks such as Siftslate instead had a base containing collision/selection and gameplay components but no geometry or materials; their visuals existed only inside permutations. It now assigns the native default state's complete presentation to the base whenever that default has a resolved model. State-specific permutations remain, so shape, rotation and texture variations still override the default. Defaults deliberately lacking a resolved model are preserved. This repairs an incomplete presentation path; the client still needs to confirm whether it addresses the reported invisibility.
+
+Live checks require geometry/materials on every modeled native default and verify all six Siftslate face materials against its opaque texture. The additional base presentations bring components with culling from 977 to 1,010; all 4,614 modeled-state conditions and 14,139 palette lookups remain valid. The 262,144 native chunk and 786,432 Bedrock palette wire checks, 62 regression tests and generated-pack audit pass on fresh/cached startup. Singer models/animations, other entities, armor, effects and sounds remain unchanged.
+
+Replace only Hydraulic and restart. Restore `sift-face-culling: true` in `config/hydraulic/config.yml` after the earlier comparison; that setting is retained rather than overwritten. Accept the regenerated resource pack.

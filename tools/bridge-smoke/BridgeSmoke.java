@@ -163,8 +163,26 @@ public class BridgeSmoke implements ModInitializer {
                 NativePacketBridge.remap(new ClientboundRemoveEntitiesPacket(EntityPackModule.TRACKED.get(player.getUUID()).keySet().stream().mapToInt(Integer::intValue).toArray()), player, null);
                 if (!EntityPackModule.TRACKED.get(player.getUUID()).isEmpty()) throw new AssertionError("Entity tracking leak");
                 EntityPackModule.TRACKED.remove(player.getUUID());
+                var manager = org.geysermc.hydraulic.HydraulicImpl.instance().getPackManager();
+                var modulesField = manager.getClass().getDeclaredField("modules"); modulesField.setAccessible(true);
+                var modules = (List<?>) modulesField.get(manager);
+                var blockModule = modules.stream().filter(org.geysermc.hydraulic.block.BlockPackModule.class::isInstance).findFirst().orElseThrow();
+                var statesField = blockModule.getClass().getDeclaredField("resolvedStates"); statesField.setAccessible(true);
+                var resolved = (Map<?, ?>) statesField.get(blockModule);
                 for (var block : org.geysermc.geyser.registry.BlockRegistries.CUSTOM_BLOCKS.get()) {
                     if (!block.identifier().startsWith("the_sift:")) continue;
+                    var defaultNative = BuiltInRegistries.BLOCK.get(net.minecraft.resources.Identifier.parse(block.identifier())).orElseThrow().value().defaultBlockState();
+                    if (resolved.containsKey(net.minecraft.commands.arguments.blocks.BlockStateParser.serialize(defaultNative))
+                            && (block.components().geometry() == null || block.components().materialInstances().isEmpty())) {
+                        throw new AssertionError("Sift base presentation lacks geometry/material: " + block.identifier());
+                    }
+                    if (block.identifier().equals("the_sift:siftslate")) {
+                        if (!block.components().geometry().identifier().equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER)) throw new AssertionError("Siftslate base geometry mismatch");
+                        for (String face : List.of("north", "south", "east", "west", "up", "down")) {
+                            var material = block.components().materialInstances().get(face);
+                            if (material == null || !"the_sift:siftslate".equals(material.texture()) || !"opaque".equals(material.renderMethod())) throw new AssertionError("Siftslate base face material mismatch: " + face);
+                        }
+                    }
                     java.util.Set<String> presentations = new java.util.TreeSet<>();
                     java.util.List<org.geysermc.geyser.api.block.custom.component.CustomBlockComponents> choices = new java.util.ArrayList<>();
                     choices.add(block.components());
@@ -178,12 +196,7 @@ public class BridgeSmoke implements ModInitializer {
                     if (!java.util.Set.of("the_sift:ichor_glass", "the_sift:ichor_glass_pane", "the_sift:ichor_cauldron").contains(block.identifier()) && methods.contains("blend")) throw new AssertionError("Unexpected blended block " + block.identifier());
                     System.out.println("HYDRAULIC RENDER AUDIT " + block.identifier() + " " + methods + " presentations=" + presentations.size());
                 }
-                var manager = org.geysermc.hydraulic.HydraulicImpl.instance().getPackManager();
-                var modulesField = manager.getClass().getDeclaredField("modules"); modulesField.setAccessible(true);
-                var modules = (List<?>) modulesField.get(manager);
-                var blockModule = modules.stream().filter(org.geysermc.hydraulic.block.BlockPackModule.class::isInstance).findFirst().orElseThrow();
-                var statesField = blockModule.getClass().getDeclaredField("resolvedStates"); statesField.setAccessible(true);
-                var resolved = (Map<?, ?>) statesField.get(blockModule);
+                System.out.println("HYDRAULIC BASE PRESENTATION AUDIT PASS: all modeled defaults have geometry/material; Siftslate binds all six opaque faces to its texture.");
                 int conditionStates = 0;
                 for (var block : org.geysermc.geyser.registry.BlockRegistries.CUSTOM_BLOCKS.get()) {
                     if (!block.identifier().startsWith("the_sift:") || block.permutations().isEmpty()) continue;
@@ -327,7 +340,7 @@ public class BridgeSmoke implements ModInitializer {
                     }
                 }
                 if (org.geysermc.hydraulic.HydraulicImpl.instance().getConfig().siftFaceCulling() && culled < 5) throw new AssertionError("Culling not applied: " + culled);
-                System.out.println("HYDRAULIC CULLING SMOKE PASS: " + culled + " custom shape components have culling rules; all Sift full-block presentations use explicit culled cubes.");
+                System.out.println("HYDRAULIC CULLING SMOKE PASS: " + culled + " custom shape components have culling rules; Sift cubes remain explicit.");
                 if (frameBlocks != 5) throw new AssertionError("Missing portal frame mappings: " + frameBlocks);
                 String key = "advancement.the_sift.story.brave_the_unknown.title";
                 String translation = org.geysermc.geyser.text.MinecraftLocale.getLocaleStringIfPresent(key, "en_us");
