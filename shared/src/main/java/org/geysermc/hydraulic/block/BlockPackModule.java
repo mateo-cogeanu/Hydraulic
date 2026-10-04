@@ -406,7 +406,7 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                 }
 
                 if (blockLocation.toString().equals("the_sift:sift_portal")) {
-                    componentsBuilder.geometry(GeometryComponent.builder().identifier("geometry.hydraulic.sift_portal").build());
+                    componentsBuilder.geometry(GeometryComponent.builder().identifier(org.geysermc.hydraulic.compat.PortalPresentation.GEOMETRY).build());
                     componentsBuilder.lightEmission(state.getLightEmission()).lightDampening(0);
                     int rotation = state.getProperties().stream()
                             .anyMatch(property -> property.getName().equals("axis") && propertyValue(state, property).equals("z")) ? 90 : 0;

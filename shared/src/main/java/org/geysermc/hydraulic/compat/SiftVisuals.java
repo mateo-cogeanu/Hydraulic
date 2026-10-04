@@ -24,9 +24,12 @@ public class SiftVisuals extends PackModule<SiftVisuals> {
                 var pack = context.bedrockResourcePack();
                 var image = context.mod().resolveFile("assets/the_sift/textures/misc/sift_portal_shaderpack.png");
                 if (image == null) image = context.mod().resolveFile("assets/the_sift/textures/block/sift_portal_mist.png");
-                pack.addExtraFile(Files.readAllBytes(image), "textures/hydraulic/the_sift/portal.png");
+                java.awt.image.BufferedImage portal;
+                try (var input = Files.newInputStream(image)) { portal = PortalPresentation.texture(ImageIO.read(input)); }
+                var encoded = new java.io.ByteArrayOutputStream();
+                ImageIO.write(portal, "png", encoded);
+                pack.addExtraFile(encoded.toByteArray(), "textures/hydraulic/the_sift/portal.png");
                 pack.addBlockTexture("hydraulic_sift_portal", "textures/hydraulic/the_sift/portal");
-                pack.addExtraFile(org.geysermc.hydraulic.block.StructureGeometry.create("geometry.hydraulic.sift_portal", "frame"), "models/blocks/hydraulic_sift_portal.geo.json");
                 pack.addExtraFile(org.geysermc.hydraulic.block.StructureGeometry.culling(), "block_culling/hydraulic_solid_cube.json");
                 for (String identifier : NativePacketBridge.PARTICLES) {
                     String name = identifier.split(":")[1];

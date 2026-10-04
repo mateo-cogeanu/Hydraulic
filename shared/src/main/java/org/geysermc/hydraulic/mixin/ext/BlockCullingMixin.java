@@ -16,7 +16,7 @@ public class BlockCullingMixin {
     private static void hydraulic$cullSolidFaces(CustomBlockComponents components, CallbackInfoReturnable<NbtMap> cir) {
         if (components == null || components.geometry() == null) return;
         String id = components.geometry().identifier();
-        if (!id.equals(StructureGeometry.IDENTIFIER) && !id.equals("geometry.hydraulic.sift_portal")) return;
+        if (!id.equals(StructureGeometry.IDENTIFIER)) return;
         NbtMap result = cir.getReturnValue();
         NbtMap geometry = result.getCompound("minecraft:geometry").toBuilder()
                 .putString("culling", StructureGeometry.CULLING).build();

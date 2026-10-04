@@ -17,6 +17,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Convert mod registry entries before MCProtocolLib decodes its vanilla-only enums. */
 public final class NativePacketBridge {
+    // Diagnostic default while investigating sustained Bedrock phone slowdown.
+    // Opt back in with -Dhydraulic.bedrock.mod-particles=true once stability is verified.
+    public static final boolean MOD_PARTICLES_ENABLED = Boolean.getBoolean("hydraulic.bedrock.mod-particles");
     public static final Map<UUID, ParticleBudget> PARTICLE_BUDGETS = new ConcurrentHashMap<>();
     public static final Set<String> PARTICLES = ConcurrentHashMap.newKeySet();
 
@@ -66,6 +69,7 @@ public final class NativePacketBridge {
         if (packet instanceof ClientboundLevelParticlesPacket particles) {
             String identifier = BuiltInRegistries.PARTICLE_TYPE.getKey(particles.particle().getType()).toString();
             if (!identifier.startsWith("minecraft:")) {
+                if (!MOD_PARTICLES_ENABLED || PortalPresentation.isPortalEffect(identifier)) return null;
                 if (PARTICLES.contains(identifier)) {
                     double dx = particles.x() - player.getX(), dy = particles.y() - player.getY(), dz = particles.z() - player.getZ();
                     if (dx * dx + dy * dy + dz * dz > 24 * 24) return null;
@@ -87,7 +91,7 @@ public final class NativePacketBridge {
                 String mode = below.getProperties().stream().filter(property -> property.getName().equals("mode"))
                         .map(property -> below.getValue(property).toString().toLowerCase(Locale.ROOT)).findFirst().orElse("");
                 if (mode.equals("note") || mode.equals("horn")) {
-                    if (mode.equals("note") && PARTICLE_BUDGETS.computeIfAbsent(owner, ignored -> new ParticleBudget()).reserve(1, System.nanoTime()) > 0) particle(session, "the_sift:sift_note", Vector3f.from(event.getPos().getX() + 0.5, event.getPos().getY() + 1.2, event.getPos().getZ() + 0.5));
+                    if (MOD_PARTICLES_ENABLED && mode.equals("note") && PARTICLE_BUDGETS.computeIfAbsent(owner, ignored -> new ParticleBudget()).reserve(1, System.nanoTime()) > 0) particle(session, "the_sift:sift_note", Vector3f.from(event.getPos().getX() + 0.5, event.getPos().getY() + 1.2, event.getPos().getZ() + 0.5));
                     // Sift's server sends the actual custom sound separately. Avoid Bedrock's
                     // automatic vanilla instrument sound for this same block event.
                     return null;

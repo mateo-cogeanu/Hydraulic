@@ -27,6 +27,18 @@ public class BridgeSmoke implements ModInitializer {
             try {
                 var player = new ServerPlayer(server, server.overworld(), new GameProfile(UUID.randomUUID(), "HydraulicProbe"), ClientInformation.createDefault());
                 int entities = 0, appearances = 0, sounds = 0;
+                if (NativePacketBridge.MOD_PARTICLES_ENABLED) throw new AssertionError("Diagnostic particles unexpectedly enabled");
+                int filteredParticles = 0;
+                for (var particleType : BuiltInRegistries.PARTICLE_TYPE) {
+                    if (!BuiltInRegistries.PARTICLE_TYPE.getKey(particleType).getNamespace().equals("the_sift")) continue;
+                    if (particleType instanceof net.minecraft.core.particles.ParticleOptions options) {
+                        var burst = new ClientboundLevelParticlesPacket(options, true, true, 1, 2, 3, 1, 1, 1, 1, 10000);
+                        if (NativePacketBridge.remap(burst, player, null) != null) throw new AssertionError("Mod particle burst not filtered");
+                        filteredParticles++;
+                    }
+                }
+                if (filteredParticles != 10) throw new AssertionError("Expected ten filtered mod particles: " + filteredParticles);
+                System.out.println("HYDRAULIC PARTICLE FILTER SMOKE PASS: ten 10,000-effect bursts suppressed without upstream work.");
                 Class.forName("net.minecraft.server.network.ServerCommonPacketListenerImpl");
                 for (var entry : EntityPackModule.PROFILES.entrySet()) {
                     int id = 1234 + entities;
@@ -124,7 +136,12 @@ public class BridgeSmoke implements ModInitializer {
                     for (var components : all) {
                         if (components == null || components.geometry() == null) continue;
                         String id = components.geometry().identifier();
-                        if (!id.equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER) && !id.equals("geometry.hydraulic.sift_portal")) continue;
+                        if (block.identifier().equals("the_sift:sift_portal")) {
+                            if (!id.equals(org.geysermc.hydraulic.compat.PortalPresentation.GEOMETRY)) throw new AssertionError("Portal is not a built-in cube");
+                            if (!components.materialInstances().get("*").renderMethod().equals("opaque")) throw new AssertionError("Portal is translucent");
+                            System.out.println("HYDRAULIC PORTAL SMOKE PASS: built-in opaque full block.");
+                        }
+                        if (!id.equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER)) continue;
                         var nbt = (org.cloudburstmc.nbt.NbtMap) convert.invoke(null, components);
                         if (!nbt.getCompound("minecraft:geometry").getString("culling").equals(org.geysermc.hydraulic.block.StructureGeometry.CULLING)) throw new AssertionError("Culling missing for " + block.identifier());
                         culled++;

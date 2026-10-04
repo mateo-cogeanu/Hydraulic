@@ -62,13 +62,12 @@ with ZipFile(sys.argv[1]) as pack:
     for name in attachables:
         description = json.loads(pack.read(name))['minecraft:attachable']['description']
         assert description['geometry']['default'] in geometries, f'Missing armor geometry: {name}'
-    assert 'geometry.hydraulic.sift_portal' in geometries
     assert 'geometry.hydraulic.structure_cube' in geometries
-    portal = geometries['geometry.hydraulic.sift_portal']['bones'][0]
-    assert portal['name'] == 'frame'
-    assert portal['cubes'][0]['origin'] == [-8, 0, -8]
-    assert portal['cubes'][0]['size'] == [16, 16, 16]
-    assert len(portal['cubes'][0]['uv']) == 6
+    assert 'geometry.hydraulic.sift_portal' not in geometries
+    import struct
+    bitmap = pack.read('textures/hydraulic/the_sift/portal.png')
+    assert bitmap.startswith(b'\x89PNG')
+    assert struct.unpack('>II', bitmap[16:24]) == (32, 32)
     culling = json.loads(pack.read('block_culling/hydraulic_solid_cube.json'))['minecraft:block_culling_rules']
     assert culling['description']['identifier'] == 'hydraulic:solid_cube'
     assert len(culling['rules']) == 6

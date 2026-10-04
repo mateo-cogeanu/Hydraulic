@@ -69,3 +69,11 @@ The user can join and play for roughly 20 seconds before the phone crashes; the 
 The previous bridge could enqueue up to 256 particle packets for each native emission with no shared per-player budget. The new bridge limits nearby mod effects to 32 per second per player, with a burst of eight, and drops emissions farther than 24 blocks. This reduces a concrete source of client and network load; it does not establish the phone crash's root cause. Entity models contain at most 16 cubes each and the unpacked generated Sift pack is roughly 18 MB. Mob models and audio remain enabled.
 
 The full-block and culling definitions follow [Microsoft's block culling documentation](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/blockreference/examples/definitions/blockculling?view=minecraft-bedrock-stable). Local tests cover burst sharing, budget replenishment and the full portal bounds. Runtime testing verifies the culling field in Geyser's emitted block components. A sustained phone test is still required to confirm stability.
+
+## Sustained phone slowdown diagnostic (2026-10-04)
+
+The phone still slows and crashes after the prior particle-limit build. It initially appeared worse near the portal, but the user now reports lag even when looking away. The cause is unconfirmed; this build reduces the portal rendering path and isolates converted particle effects.
+
+The portal uses `minecraft:geometry.full_block` with an opaque static 32×32 texture instead of custom portal geometry and the original 384×256 shader fallback. Java travel/collision logic is unchanged. Converted mod particles, including Sonorous note visuals, are disabled by default in this diagnostic build; note and entity sounds remain enabled, as do mob/armor models. Optional `-Dhydraulic.bedrock.mod-particles=true` before `-jar` re-enables budgeted non-portal mod particles. Portal parallax stays disabled. Vanilla particles are unaffected.
+
+Thirty-seven regression tests pass. The pack audit checks the actual 32×32 PNG and absence of custom portal geometry; runtime checks verify built-in opaque portal components and frame culling. These are server/asset checks, not confirmation that the phone crash is solved. Comparison with Java clients, the Overworld and a sustained phone session is needed if lag remains.
