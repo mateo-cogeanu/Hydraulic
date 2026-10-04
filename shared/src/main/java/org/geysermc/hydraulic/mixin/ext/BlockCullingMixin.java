@@ -9,17 +9,17 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Hide buried faces of Hydraulic's explicit solid cubes. */
+/** Cull boundary faces of Sift geometry against occluding neighbors. */
 @Mixin(value = CustomBlockRegistryPopulator.class, remap = false)
 public class BlockCullingMixin {
     @Inject(method = "convertComponents", at = @At("RETURN"), cancellable = true)
     private static void hydraulic$cullSolidFaces(CustomBlockComponents components, CallbackInfoReturnable<NbtMap> cir) {
         if (components == null || components.geometry() == null) return;
         String id = components.geometry().identifier();
-        if (!id.equals(StructureGeometry.IDENTIFIER)) return;
+        if (!id.equals(StructureGeometry.IDENTIFIER) && !id.startsWith("geometry.the_sift.")) return;
         NbtMap result = cir.getReturnValue();
         NbtMap geometry = result.getCompound("minecraft:geometry").toBuilder()
-                .putString("culling", StructureGeometry.CULLING).build();
+                .putString("culling", id.equals(StructureGeometry.IDENTIFIER) ? StructureGeometry.CULLING : org.geysermc.hydraulic.block.GeometryCulling.identifier(id)).build();
         cir.setReturnValue(result.toBuilder().putCompound("minecraft:geometry", geometry).build());
     }
 }

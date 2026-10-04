@@ -15,9 +15,9 @@ public final class MobileViewDistance {
         return inSift(world) ? Math.min(requested, MAXIMUM) : requested;
     }
 
-    public static int particleCount(int requested, String world, boolean portal, ParticleBudget budget, long now) {
+    public static int particleCount(int requested, String world, ParticleBudget budget, long now) {
         if (!inSift(world)) return Math.clamp(requested, 0, 256);
-        return portal ? 0 : budget.reserve(requested, now);
+        return budget.reserve(requested, now);
     }
 
     public static int limit(int requested, String deviceOs) {

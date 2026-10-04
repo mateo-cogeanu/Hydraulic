@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Convert mod registry entries before MCProtocolLib decodes its vanilla-only enums. */
 public final class NativePacketBridge {
+    public static final Map<UUID, EntityUpdateCache> ENTITY_UPDATES = new ConcurrentHashMap<>();
     public static final Map<UUID, ParticleBudget> PARTICLE_BUDGETS = new ConcurrentHashMap<>();
     public static final Set<String> PARTICLES = ConcurrentHashMap.newKeySet();
 
@@ -32,6 +33,14 @@ public final class NativePacketBridge {
                 if (result != null) packets.add((Packet) result);
             }
             return changed ? new ClientboundBundlePacket(packets) : packet;
+        }
+        if (MobileViewDistance.inSift(player.level().dimension().identifier().toString())
+                && packet instanceof ClientboundSetEntityMotionPacket motion) {
+            var updates = ENTITY_UPDATES.computeIfAbsent(owner, ignored -> new EntityUpdateCache());
+            if (updates.duplicate(player.level().getGameTime(), motion.id(), motion.movement())) return null;
+        } else {
+            // Preserve ordering with teleports, position updates and other corrections.
+            ENTITY_UPDATES.remove(owner);
         }
         if (packet instanceof ClientboundAddEntityPacket entity) {
             var profile = EntityPackModule.PROFILES.get(entity.getType());
@@ -79,7 +88,7 @@ public final class NativePacketBridge {
                     String world = player.level().dimension().identifier().toString();
                     if (MobileViewDistance.inSift(world) && dx * dx + dy * dy + dz * dz > 24 * 24) return null;
                     int count = MobileViewDistance.particleCount(particles.count() == 0 ? 1 : particles.count(), world,
-                            PortalPresentation.isPortalEffect(identifier), PARTICLE_BUDGETS.computeIfAbsent(owner, ignored -> new ParticleBudget()), System.nanoTime());
+                            PARTICLE_BUDGETS.computeIfAbsent(owner, ignored -> new ParticleBudget()), System.nanoTime());
                     var random = java.util.concurrent.ThreadLocalRandom.current();
                     for (int i = 0; i < count; i++) {
                         var position = Vector3f.from(particles.x() + random.nextGaussian() * particles.xDist(),
@@ -96,7 +105,7 @@ public final class NativePacketBridge {
                 String mode = below.getProperties().stream().filter(property -> property.getName().equals("mode"))
                         .map(property -> below.getValue(property).toString().toLowerCase(Locale.ROOT)).findFirst().orElse("");
                 if (mode.equals("note") || mode.equals("horn")) {
-                    if (mode.equals("note") && MobileViewDistance.particleCount(1, player.level().dimension().identifier().toString(), false,
+                    if (mode.equals("note") && MobileViewDistance.particleCount(1, player.level().dimension().identifier().toString(),
                             PARTICLE_BUDGETS.computeIfAbsent(owner, ignored -> new ParticleBudget()), System.nanoTime()) > 0) particle(session, "the_sift:sift_note", Vector3f.from(event.getPos().getX() + 0.5, event.getPos().getY() + 1.2, event.getPos().getZ() + 0.5));
                     // Sift's server sends the actual custom sound separately. Avoid Bedrock's
                     // automatic vanilla instrument sound for this same block event.

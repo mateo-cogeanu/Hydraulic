@@ -9,6 +9,13 @@ import java.util.Map;
 
 @Mixin(targets = "team.unnamed.creative.serialize.minecraft.model.ModelSerializer", remap = false)
 public class ModelSerializerMixin {
+    @org.spongepowered.asm.mixin.injection.ModifyVariable(
+        method = "deserializeFromJson(Lcom/google/gson/JsonElement;Lnet/kyori/adventure/key/Key;Lteam/unnamed/creative/metadata/pack/PackFormat;)Lteam/unnamed/creative/model/Model;",
+        at = @At("HEAD"), argsOnly = true, ordinal = 0)
+    private com.google.gson.JsonElement hydraulic$defaultUvs(com.google.gson.JsonElement source) {
+        return org.geysermc.hydraulic.block.ImplicitModelUvs.normalize(source);
+    }
+
     @Redirect(
         method = "deserializeFromJson(Lcom/google/gson/JsonElement;Lnet/kyori/adventure/key/Key;Lteam/unnamed/creative/metadata/pack/PackFormat;)Lteam/unnamed/creative/model/Model;",
         at = @At(

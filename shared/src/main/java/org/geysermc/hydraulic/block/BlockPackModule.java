@@ -77,7 +77,6 @@ import java.util.Set;
 
 @AutoService(PackModule.class)
 public class BlockPackModule extends PackModule<BlockPackModule> {
-    private static final String STATE_CONDITION = "query.block_property('%s') == %s";
 
     private final Map<String, StateDefinition> blockStates = new HashMap<>();
     private final Map<Key, List<ModelDefinition>> multipartModels = new HashMap<>();
@@ -89,6 +88,14 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
 
         this.preProcess(this::preProcess);
         this.postProcess(this::postProcess);
+    }
+
+    private static void exportCulling(BedrockResourcePack pack, JsonObject document) {
+        for (var geometry : document.getAsJsonArray("minecraft:geometry")) {
+            JsonObject rules = GeometryCulling.definition(geometry.getAsJsonObject());
+            String id = rules.getAsJsonObject("minecraft:block_culling_rules").getAsJsonObject("description").get("identifier").getAsString();
+            pack.addExtraFile(rules, "block_culling/" + id.split(":")[1] + ".json");
+        }
     }
 
     private void preProcess(@NotNull PackPreProcessContext<BlockPackModule> context) {
@@ -164,6 +171,20 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
             bedrockPack.addExtraFile(StructureGeometry.create(), "models/blocks/hydraulic_structure_cube.geo.json");
         }
 
+        if (context.mod().namespace().equals("the_sift")) {
+            for (Model model : assets.models()) {
+                Model stitched = new ModelStitcher(context.modelProvider(), model, new PackLogListener(context.logger())).stitch();
+                if (stitched == null) continue;
+                try {
+                    var converted = ModelConverter.INSTANCE.convert(stitched, new ConversionContext(context.mod().name(), new PackLogListener(context.logger())));
+                    if (converted == null) continue;
+                    JsonObject document = new Gson().toJsonTree(converted.model()).getAsJsonObject();
+                    bedrockPack.addExtraFile(document, "models/blocks/" + converted.fileName());
+                    exportCulling(bedrockPack, document);
+                } catch (Exception e) { throw new IllegalStateException("Could not export culled Sift model " + model.key(), e); }
+            }
+        }
+
         // Each matching multipart selector contributes a separately rotated part.
         // Export a complete geometry instead of dropping every part after the first match.
         for (var entry : multipartModels.entrySet()) {
@@ -217,6 +238,7 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                 geometries.add(geometry);
                 document.add("minecraft:geometry", geometries);
                 bedrockPack.addExtraFile(document, "models/blocks/" + name + ".json");
+                if (context.mod().namespace().equals("the_sift")) exportCulling(bedrockPack, document);
             }
         }
 
@@ -274,6 +296,9 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
             }
 
             List<CustomBlockPermutation> permutations = new ArrayList<>();
+            Map<String, CustomBlockComponents> presentations = new java.util.LinkedHashMap<>();
+            Map<String, List<Map<String, String>>> presentationStates = new java.util.LinkedHashMap<>();
+            Map<String, Set<String>> domains = new HashMap<>();
             CustomBlockComponents.Builder baseComponentBuilder = CustomBlockComponents.builder();
             for (BlockState state : block.getStateDefinition().getPossibleStates()) {
                 ModelDefinition definition = getModel(context, blockLocation, state);
@@ -396,7 +421,7 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                 }
 
                 if (StructureGeometry.isSiftSolidCube(blockLocation.toString())) {
-                    componentsBuilder.geometry(GeometryComponent.builder().identifier(StructureGeometry.IDENTIFIER).build());
+                    componentsBuilder.geometry(GeometryComponent.builder().identifier("minecraft:geometry.full_block").build());
                 }
 
                 if (blockLocation.toString().equals("the_sift:sift_portal")) {
@@ -418,20 +443,27 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                     continue;
                 }
 
-                List<String> conditions = new ArrayList<>();
+                Map<String, String> conditions = new HashMap<>();
                 for (Property<?> property : state.getProperties()) {
                     String propValue = state.getValue(property).toString();
                     if (property instanceof EnumProperty<?>) {
                         propValue = "'" + propValue.toLowerCase() + "'";
                     }
 
-                    conditions.add(String.format(STATE_CONDITION, property.getName(), propValue));
+                    conditions.put(property.getName(), propValue);
+                    domains.computeIfAbsent(property.getName(), ignored -> new HashSet<>()).add(propValue);
                 }
 
-                String condition = String.join(" && ", conditions);
-                permutations.add(new CustomBlockPermutation(componentsBuilder.build(), condition));
+                CustomBlockComponents components = componentsBuilder.build();
+                String signature = new Gson().toJson(components);
+                presentations.putIfAbsent(signature, components);
+                presentationStates.computeIfAbsent(signature, ignored -> new ArrayList<>()).add(conditions);
             }
 
+            for (var entry : presentations.entrySet()) {
+                String condition = PermutationConditions.condition(presentationStates.get(entry.getKey()), domains);
+                permutations.add(new CustomBlockPermutation(entry.getValue(), condition));
+            }
             builder.permutations(permutations);
 
             BlockState defaultState = block.defaultBlockState();

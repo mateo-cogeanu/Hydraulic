@@ -27,7 +27,7 @@ with ZipFile(sys.argv[1]) as pack:
         assert description['identifier'] in binding, name
         assert description['textures']['default'] + '.png' in names, name
 
-    multipart = [name for name in names if 'hydraulic_multipart_' in name and name.endswith('.json')]
+    multipart = [name for name in names if name.startswith('models/blocks/') and 'hydraulic_multipart_' in name and name.endswith('.json')]
     assert multipart, 'No multipart geometry was exported'
     assert len(multipart) < 1000, 'Equivalent states must reuse their geometry'
     largest_parts = 0
@@ -59,6 +59,31 @@ with ZipFile(sys.argv[1]) as pack:
             document = json.loads(pack.read(name))
             for geometry in document.get('minecraft:geometry', []):
                 geometries[geometry['description']['identifier']] = geometry
+                if name.startswith('models/blocks/'):
+                    for bone in geometry.get('bones', []):
+                        for cube in bone.get('cubes', []):
+                            assert cube.get('uv') != {}, f'Invisible cube with empty faces: {name}'
+                    identifier = geometry['description']['identifier']
+                    if identifier.startswith('geometry.the_sift.'):
+                        culling_path = 'block_culling/cull_' + identifier.replace('.', '_').replace(':', '_') + '.json'
+                        assert culling_path in names, f'Missing shape culling: {identifier}'
+    shape_culling = 0
+    for name in names:
+        if not name.startswith('block_culling/cull_geometry_the_sift_') or not name.endswith('.json'):
+            continue
+        body = json.loads(pack.read(name))['minecraft:block_culling_rules']
+        candidates = [g for identifier, g in geometries.items() if body['description']['identifier'] == 'hydraulic:cull_' + identifier.replace('.', '_').replace(':', '_')]
+        assert len(candidates) == 1, f'Culling geometry reference: {name}'
+        bones = {b['name']: b for b in candidates[0]['bones']}
+        for rule in body['rules']:
+            part = rule['geometry_part']
+            assert part['bone'] in bones, f'Culling bone missing: {name}'
+            cubes = bones[part['bone']].get('cubes', [])
+            assert 0 <= part['cube'] < len(cubes), f'Culling cube missing: {name}'
+            assert part['face'] in cubes[part['cube']]['uv'], f'Culling face missing: {name}'
+            assert rule['direction'] == part['face'], f'Culling direction mismatch: {name}'
+            shape_culling += 1
+    assert shape_culling > 0, 'No usable Sift shape culling rules'
     for name in attachables:
         description = json.loads(pack.read(name))['minecraft:attachable']['description']
         assert description['geometry']['default'] in geometries, f'Missing armor geometry: {name}'

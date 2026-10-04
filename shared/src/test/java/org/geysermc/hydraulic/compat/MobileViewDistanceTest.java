@@ -13,11 +13,10 @@ class MobileViewDistanceTest {
     }
     @Test void overworldEffectsAreRestoredWhileSiftBurstsAreBounded() {
         var budget = new ParticleBudget();
-        assertEquals(100, MobileViewDistance.particleCount(100, "minecraft:overworld", true, budget, 1_000_000_000));
-        assertEquals(0, MobileViewDistance.particleCount(100, "the_sift:the_sift", true, budget, 1_000_000_000));
-        assertEquals(8, MobileViewDistance.particleCount(100, "the_sift:the_sift", false, budget, 1_000_000_000));
-        assertEquals(0, MobileViewDistance.particleCount(100, "the_sift:the_sift", false, budget, 1_000_000_000));
-        assertEquals(100, MobileViewDistance.particleCount(100, "minecraft:overworld", false, budget, 1_000_000_000));
+        assertEquals(100, MobileViewDistance.particleCount(100, "minecraft:overworld", budget, 1_000_000_000));
+        assertEquals(8, MobileViewDistance.particleCount(100, "the_sift:the_sift", budget, 1_000_000_000));
+        assertEquals(0, MobileViewDistance.particleCount(100, "the_sift:the_sift", budget, 1_000_000_000));
+        assertEquals(100, MobileViewDistance.particleCount(100, "minecraft:overworld", budget, 1_000_000_000));
     }
     @Test void limitsPhoneAndTabletRequests() {
         for (String os : new String[]{"IOS", "GOOGLE", "AMAZON"}) {

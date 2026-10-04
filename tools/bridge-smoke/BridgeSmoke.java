@@ -169,6 +169,29 @@ public class BridgeSmoke implements ModInitializer {
                     if (!java.util.Set.of("the_sift:ichor_glass", "the_sift:ichor_glass_pane", "the_sift:ichor_cauldron").contains(block.identifier()) && methods.contains("blend")) throw new AssertionError("Unexpected blended block " + block.identifier());
                     System.out.println("HYDRAULIC RENDER AUDIT " + block.identifier() + " " + methods + " presentations=" + presentations.size());
                 }
+                var manager = org.geysermc.hydraulic.HydraulicImpl.instance().getPackManager();
+                var modulesField = manager.getClass().getDeclaredField("modules"); modulesField.setAccessible(true);
+                var modules = (List<?>) modulesField.get(manager);
+                var blockModule = modules.stream().filter(org.geysermc.hydraulic.block.BlockPackModule.class::isInstance).findFirst().orElseThrow();
+                var statesField = blockModule.getClass().getDeclaredField("resolvedStates"); statesField.setAccessible(true);
+                var resolved = (Map<?, ?>) statesField.get(blockModule);
+                int conditionStates = 0;
+                for (var block : org.geysermc.geyser.registry.BlockRegistries.CUSTOM_BLOCKS.get()) {
+                    if (!block.identifier().startsWith("the_sift:") || block.permutations().isEmpty()) continue;
+                    var nativeBlock = BuiltInRegistries.BLOCK.get(net.minecraft.resources.Identifier.parse(block.identifier())).orElseThrow().value();
+                    for (var state : nativeBlock.getStateDefinition().getPossibleStates()) {
+                        Map<String, String> values = new HashMap<>();
+                        for (var property : state.getProperties()) values.put(property.getName(), state.getValue(property).toString().toLowerCase(java.util.Locale.ROOT));
+                        long matches = block.permutations().stream().filter(p -> matchesCondition(p.condition(), values)).count();
+                        if (!resolved.containsKey(net.minecraft.commands.arguments.blocks.BlockStateParser.serialize(state))) {
+                            if (matches != 0) throw new AssertionError("Previously absent model gained a permutation: " + state);
+                            continue;
+                        }
+                        if (matches != 1) throw new AssertionError("Permutation coverage " + matches + " for " + state);
+                        conditionStates++;
+                    }
+                }
+                System.out.println("HYDRAULIC PERMUTATION AUDIT PASS: " + conditionStates + " native states select exactly one shared definition.");
                 int solidMappings = 0;
                 for (var state : net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY) {
                     if (!BuiltInRegistries.BLOCK.getKey(state.getBlock()).getNamespace().equals("the_sift")) continue;
@@ -203,9 +226,9 @@ public class BridgeSmoke implements ModInitializer {
                     if (org.geysermc.hydraulic.block.StructureGeometry.isSiftSolidCube(block.identifier())) {
                         var components = block.components();
                         var geometry = components.geometry();
-                        if (geometry == null || !geometry.identifier().equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER)) {
+                        if (geometry == null || !geometry.identifier().equals("minecraft:geometry.full_block")) {
                             boolean permutationMatch = block.permutations().stream().anyMatch(permutation ->
-                                    permutation.components().geometry() != null && permutation.components().geometry().identifier().equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER));
+                                    permutation.components().geometry() != null && permutation.components().geometry().identifier().equals("minecraft:geometry.full_block"));
                             if (!permutationMatch) throw new AssertionError("Frame geometry not assigned to " + block.identifier());
                         }
                         frameBlocks++;
@@ -227,14 +250,14 @@ public class BridgeSmoke implements ModInitializer {
                             if (!components.materialInstances().get("*").renderMethod().equals("opaque")) throw new AssertionError("Portal is translucent");
                             System.out.println("HYDRAULIC PORTAL SMOKE PASS: built-in opaque full block.");
                         }
-                        if (!id.equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER)) continue;
+                        if (!id.startsWith("geometry.the_sift.")) continue;
                         var nbt = (org.cloudburstmc.nbt.NbtMap) convert.invoke(null, components);
-                        if (!nbt.getCompound("minecraft:geometry").getString("culling").equals(org.geysermc.hydraulic.block.StructureGeometry.CULLING)) throw new AssertionError("Culling missing for " + block.identifier());
+                        if (!nbt.getCompound("minecraft:geometry").getString("culling").equals(org.geysermc.hydraulic.block.GeometryCulling.identifier(id))) throw new AssertionError("Culling missing for " + block.identifier());
                         culled++;
                     }
                 }
                 if (culled < 5) throw new AssertionError("Culling not applied: " + culled);
-                System.out.println("HYDRAULIC CULLING SMOKE PASS: " + culled + " cube components have culling rules.");
+                System.out.println("HYDRAULIC CULLING SMOKE PASS: " + culled + " custom shape components have culling rules; five terrain types use native full blocks.");
                 if (frameBlocks != 5) throw new AssertionError("Missing portal frame mappings: " + frameBlocks);
                 String key = "advancement.the_sift.story.brave_the_unknown.title";
                 String translation = org.geysermc.geyser.text.MinecraftLocale.getLocaleStringIfPresent(key, "en_us");
@@ -246,4 +269,20 @@ public class BridgeSmoke implements ModInitializer {
             }
         });
     }
+    private static boolean matchesCondition(String expression, Map<String, String> values) {
+        if (expression.equals("1.0")) return true;
+        var atom = java.util.regex.Pattern.compile("query\\.block_property\\('([^']+)'\\) == '?([^']+?)'?$");
+        for (String alternative : expression.split(" \\|\\| ")) {
+            String term = alternative.substring(1, alternative.length() - 1);
+            boolean matches = true;
+            for (String comparison : term.split(" && ")) {
+                var matcher = atom.matcher(comparison);
+                if (!matcher.matches()) throw new AssertionError("Unexpected condition " + comparison);
+                if (!Objects.equals(values.get(matcher.group(1)), matcher.group(2))) matches = false;
+            }
+            if (matches) return true;
+        }
+        return false;
+    }
+
 }

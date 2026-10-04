@@ -102,6 +102,7 @@ public class EntityPackModule extends PackModule<EntityPackModule> {
         UUID uuid = event.connection().javaUuid();
         if (uuid != null) {
             TRACKED.remove(uuid);
+            org.geysermc.hydraulic.compat.NativePacketBridge.ENTITY_UPDATES.remove(uuid);
             SiftAnimationBridge.STATES.remove(uuid);
             org.geysermc.hydraulic.compat.NativePacketBridge.PARTICLE_BUDGETS.remove(uuid);
         }
