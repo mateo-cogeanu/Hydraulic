@@ -196,6 +196,14 @@ public class PackManager {
 
                 module.postProcess0(context);
             }
+            if (mod.namespace().equals("the_sift")) {
+                try {
+                    int reduced = org.geysermc.hydraulic.compat.AnimatedTextureBudget.apply(bedrockPack);
+                    LOGGER.info("Reduced {} Sift animated textures to 32-pixel frames", reduced);
+                } catch (IOException e) {
+                    throw new IllegalStateException("Could not bound Sift animation texture memory", e);
+                }
+            }
         });
 
         try {

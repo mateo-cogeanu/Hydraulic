@@ -76,6 +76,12 @@ with ZipFile(sys.argv[1]) as pack:
         assert rule['geometry_part']['face'] == rule['direction']
     manifest = json.loads(pack.read('manifest.json'))
     assert manifest['header']['min_engine_version'] >= [1, 26, 0]
+    flipbooks = json.loads(pack.read('textures/flipbook_textures.json'))
+    assert len(flipbooks) == 2
+    for flipbook in flipbooks:
+        bitmap = pack.read(flipbook['flipbook_texture'] + '.png')
+        assert struct.unpack('>II', bitmap[16:24]) == (32, 1024)
+        assert flipbook['ticks_per_frame'] == 10
     terrain = json.loads(pack.read('textures/terrain_texture.json'))['texture_data']
     assert 'hydraulic_sift_portal' in terrain
     assert 'textures/hydraulic/the_sift/portal.png' in names
