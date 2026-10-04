@@ -32,7 +32,7 @@ public final class SiftAnimationControllers {
             JsonObject appear = all.getAsJsonObject(prefix + ".appear");
             all.add(prefix + ".close", reverse(appear));
             JsonObject open = appear.deepCopy();
-            open.addProperty("anim_time", open.get("animation_length").getAsDouble());
+            open.addProperty("anim_time_update", open.get("animation_length").getAsDouble());
             all.add(prefix + ".open", open);
         }
         Map<String, String> aliases = new LinkedHashMap<>();
@@ -43,14 +43,14 @@ public final class SiftAnimationControllers {
             if (!alias.equals("open")) {
                 double length = animation.has("animation_length") ? animation.get("animation_length").getAsDouble() : 1;
                 boolean loop = animation.has("loop") && animation.get("loop").isJsonPrimitive() && animation.get("loop").getAsJsonPrimitive().isBoolean() && animation.get("loop").getAsBoolean();
-                animation.addProperty("anim_time", loop ? "math.mod(variable.hydraulic_time, " + length + ")" : "math.min(variable.hydraulic_time, " + length + ")");
+                animation.addProperty("anim_time_update", loop ? "math.mod(variable.hydraulic_time, " + length + ")" : "math.min(variable.hydraulic_time, " + length + ")");
             }
             aliases.put(alias, key);
         }
         aliases.put("sift_phase", "controller.animation.hydraulic." + name);
         description.add("animations", GSON.toJsonTree(aliases));
-        description.add("scripts", GSON.toJsonTree(Map.of("initialize", List.of("variable.hydraulic_last_tick = -1; variable.hydraulic_last_variant = -1; variable.hydraulic_sync_life = 0;"),
-                "pre_animation", List.of("if (query.mark_variant != variable.hydraulic_last_tick || query.variant != variable.hydraulic_last_variant) { variable.hydraulic_sync_life = query.life_time; variable.hydraulic_last_tick = query.mark_variant; variable.hydraulic_last_variant = query.variant; } variable.hydraulic_time = query.mark_variant / 20.0 + query.life_time - variable.hydraulic_sync_life;"), "animate", List.of("sift_phase"))));
+        description.add("scripts", GSON.toJsonTree(Map.of("initialize", List.of("variable.hydraulic_last_tick = -1; variable.hydraulic_last_variant = -1; variable.hydraulic_sync_life = 0; variable.hydraulic_time = 0;"),
+                "pre_animation", List.of("(query.mark_variant != variable.hydraulic_last_tick || query.variant != variable.hydraulic_last_variant) ? { variable.hydraulic_sync_life = query.life_time; variable.hydraulic_last_tick = query.mark_variant; variable.hydraulic_last_variant = query.variant; }; variable.hydraulic_time = query.mark_variant / 20.0 + query.life_time - variable.hydraulic_sync_life;"), "animate", List.of("sift_phase"))));
     }
     public static JsonObject reverse(JsonObject source) {
         JsonObject result = source.deepCopy();

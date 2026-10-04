@@ -53,6 +53,14 @@ with ZipFile(sys.argv[1]) as pack:
         for sound in definition.get('sounds', []):
             path = sound if isinstance(sound, str) else sound['name']
             assert path + '.ogg' in names, f'Missing sound: {path}'
+    for actor in ('singer', 'rift', 'mini_rift'):
+        actor_animations = json.loads(pack.read('animations/' + actor + '.animation.json'))['animations']
+        for identifier, animation in actor_animations.items():
+            assert 'anim_time' not in animation, f'Unsupported animation timing: {identifier}'
+            assert 'anim_time_update' in animation, f'Missing phase time: {identifier}'
+        scripts = json.loads(pack.read('entity/' + actor + '.entity.json'))['minecraft:client_entity']['description']['scripts']
+        for script in scripts['pre_animation']:
+            assert 'if (' not in script, f'Invalid Molang conditional: {actor}'
     geometries = {}
     for name in names:
         if name.startswith('models/') and name.endswith('.json'):

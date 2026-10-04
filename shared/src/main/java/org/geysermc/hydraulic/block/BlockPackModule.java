@@ -421,7 +421,7 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                 }
 
                 if (StructureGeometry.isSiftSolidCube(blockLocation.toString())) {
-                    componentsBuilder.geometry(GeometryComponent.builder().identifier("minecraft:geometry.full_block").build());
+                    componentsBuilder.geometry(GeometryComponent.builder().identifier(StructureGeometry.IDENTIFIER).build());
                 }
 
                 if (blockLocation.toString().equals("the_sift:sift_portal")) {

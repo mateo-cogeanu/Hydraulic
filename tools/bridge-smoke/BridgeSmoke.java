@@ -226,9 +226,9 @@ public class BridgeSmoke implements ModInitializer {
                     if (org.geysermc.hydraulic.block.StructureGeometry.isSiftSolidCube(block.identifier())) {
                         var components = block.components();
                         var geometry = components.geometry();
-                        if (geometry == null || !geometry.identifier().equals("minecraft:geometry.full_block")) {
+                        if (geometry == null || !geometry.identifier().equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER)) {
                             boolean permutationMatch = block.permutations().stream().anyMatch(permutation ->
-                                    permutation.components().geometry() != null && permutation.components().geometry().identifier().equals("minecraft:geometry.full_block"));
+                                    permutation.components().geometry() != null && permutation.components().geometry().identifier().equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER));
                             if (!permutationMatch) throw new AssertionError("Frame geometry not assigned to " + block.identifier());
                         }
                         frameBlocks++;
@@ -250,14 +250,14 @@ public class BridgeSmoke implements ModInitializer {
                             if (!components.materialInstances().get("*").renderMethod().equals("opaque")) throw new AssertionError("Portal is translucent");
                             System.out.println("HYDRAULIC PORTAL SMOKE PASS: built-in opaque full block.");
                         }
-                        if (!id.startsWith("geometry.the_sift.")) continue;
+                        if (!id.startsWith("geometry.the_sift.") && !id.equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER)) continue;
                         var nbt = (org.cloudburstmc.nbt.NbtMap) convert.invoke(null, components);
-                        if (!nbt.getCompound("minecraft:geometry").getString("culling").equals(org.geysermc.hydraulic.block.GeometryCulling.identifier(id))) throw new AssertionError("Culling missing for " + block.identifier());
+                        if (!nbt.getCompound("minecraft:geometry").getString("culling").equals((id.equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER) ? org.geysermc.hydraulic.block.StructureGeometry.CULLING : org.geysermc.hydraulic.block.GeometryCulling.identifier(id)))) throw new AssertionError("Culling missing for " + block.identifier());
                         culled++;
                     }
                 }
                 if (culled < 5) throw new AssertionError("Culling not applied: " + culled);
-                System.out.println("HYDRAULIC CULLING SMOKE PASS: " + culled + " custom shape components have culling rules; five terrain types use native full blocks.");
+                System.out.println("HYDRAULIC CULLING SMOKE PASS: " + culled + " custom shape components have culling rules; five terrain types use explicit culled full cubes.");
                 if (frameBlocks != 5) throw new AssertionError("Missing portal frame mappings: " + frameBlocks);
                 String key = "advancement.the_sift.story.brave_the_unknown.title";
                 String translation = org.geysermc.geyser.text.MinecraftLocale.getLocaleStringIfPresent(key, "en_us");

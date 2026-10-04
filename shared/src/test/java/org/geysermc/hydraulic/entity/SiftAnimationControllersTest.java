@@ -20,6 +20,25 @@ class SiftAnimationControllersTest {
                 .getAsJsonObject("controller.animation.hydraulic.rift").getAsJsonObject("states");
         assertTrue(rift.has("open") && rift.has("appear") && rift.has("close"));
     }
+    @Test void phaseAnimationsUseBedrockTimingAndConditionalSyntax() {
+        var description = new com.google.gson.JsonObject();
+        var animations = new com.google.gson.JsonObject();
+        var definitions = new com.google.gson.JsonObject();
+        String prefix = "animation.hydraulic.the_sift.singer";
+        for (String phase : SiftAnimationControllers.phases("singer").values()) {
+            definitions.add(prefix + "." + phase, JsonParser.parseString("{\"animation_length\":2,\"loop\":true,\"bones\":{}}"));
+        }
+        animations.add("animations", definitions);
+        SiftAnimationControllers.configure(description, animations, "singer", prefix);
+        for (var definition : definitions.entrySet()) {
+            var animation = definition.getValue().getAsJsonObject();
+            assertFalse(animation.has("anim_time"), "Unsupported field rejects Bedrock animations");
+            assertTrue(animation.has("anim_time_update"));
+        }
+        String script = description.getAsJsonObject("scripts").getAsJsonArray("pre_animation").get(0).getAsString();
+        assertFalse(script.contains("if ("), "Molang uses conditional operators, not Java if statements");
+        assertTrue(script.contains("? {") && script.contains("};"));
+    }
     @Test void closingReversesOpeningKeyframesWithoutChangingTheSource() {
         var source = JsonParser.parseString("{\"animation_length\":1,\"bones\":{\"main\":{\"scale\":{\"0.0\":[0,0,0],\"1.0\":[1,1,1]}}}}").getAsJsonObject();
         var reverse = SiftAnimationControllers.reverse(source);
