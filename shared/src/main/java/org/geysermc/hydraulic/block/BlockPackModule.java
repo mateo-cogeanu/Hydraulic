@@ -326,14 +326,8 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                             .build());
                 }
 
-                // TODO: Work this out based on block state/texture? as this isn't perfect
-                // https://wiki.bedrock.dev/blocks/block-components.html#render-methods
-                String renderMethod = state.canOcclude() ? "opaque" : "blend";
-
-                // If the model is a cross block (EG a flower), we need to use alpha_test_single_sided
-                if (model.parent() != null && model.parent().value().equals("block/cross")) {
-                    renderMethod = "alpha_test_single_sided";
-                }
+                String renderMethod = BlockRenderPolicy.renderMethod(blockLocation.toString(), state.canOcclude(),
+                        model.parent() != null && model.parent().value().equals("block/cross"));
 
                 String tintMethod = null;
                 // TODO Read this from the model data
@@ -401,7 +395,7 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                     context.logger().warn("Could not find material for block {}", key);
                 }
 
-                if (StructureGeometry.isSiftFrame(blockLocation.toString())) {
+                if (StructureGeometry.isSiftSolidCube(blockLocation.toString())) {
                     componentsBuilder.geometry(GeometryComponent.builder().identifier(StructureGeometry.IDENTIFIER).build());
                 }
 

@@ -10,6 +10,9 @@ public final class StructureGeometry {
     public static boolean isSiftFrame(String identifier) {
         return java.util.Set.of("the_sift:siftslate", "the_sift:siftslate_growth", "the_sift:healthy_sculk", "the_sift:reinforced_siftslate").contains(identifier);
     }
+    public static boolean isSiftSolidCube(String identifier) {
+        return isSiftFrame(identifier) || identifier.equals("the_sift:dry_healthy_sculk");
+    }
     public static JsonObject create() {
         return create(IDENTIFIER, "frame");
     }

@@ -113,9 +113,24 @@ public class BridgeSmoke implements ModInitializer {
                 NativePacketBridge.remap(new ClientboundRemoveEntitiesPacket(EntityPackModule.TRACKED.get(player.getUUID()).keySet().stream().mapToInt(Integer::intValue).toArray()), player, null);
                 if (!EntityPackModule.TRACKED.get(player.getUUID()).isEmpty()) throw new AssertionError("Entity tracking leak");
                 EntityPackModule.TRACKED.remove(player.getUUID());
+                for (var block : org.geysermc.geyser.registry.BlockRegistries.CUSTOM_BLOCKS.get()) {
+                    if (!block.identifier().startsWith("the_sift:")) continue;
+                    java.util.Set<String> presentations = new java.util.TreeSet<>();
+                    java.util.List<org.geysermc.geyser.api.block.custom.component.CustomBlockComponents> choices = new java.util.ArrayList<>();
+                    choices.add(block.components());
+                    block.permutations().forEach(permutation -> choices.add(permutation.components()));
+                    for (var components : choices) {
+                        if (components == null || components.geometry() == null) continue;
+                        presentations.add(components.geometry().identifier() + " " + components.materialInstances().values().stream().map(material -> material.renderMethod()).distinct().sorted().toList());
+                    }
+                    var methods = choices.stream().filter(java.util.Objects::nonNull).flatMap(c -> c.materialInstances().values().stream())
+                            .map(m -> m.renderMethod()).distinct().sorted().toList();
+                    if (!java.util.Set.of("the_sift:ichor_glass", "the_sift:ichor_glass_pane", "the_sift:ichor_cauldron").contains(block.identifier()) && methods.contains("blend")) throw new AssertionError("Unexpected blended block " + block.identifier());
+                    System.out.println("HYDRAULIC RENDER AUDIT " + block.identifier() + " " + methods + " presentations=" + presentations.size());
+                }
                 int frameBlocks = 0;
                 for (var block : org.geysermc.geyser.registry.BlockRegistries.CUSTOM_BLOCKS.get()) {
-                    if (org.geysermc.hydraulic.block.StructureGeometry.isSiftFrame(block.identifier())) {
+                    if (org.geysermc.hydraulic.block.StructureGeometry.isSiftSolidCube(block.identifier())) {
                         var components = block.components();
                         var geometry = components.geometry();
                         if (geometry == null || !geometry.identifier().equals(org.geysermc.hydraulic.block.StructureGeometry.IDENTIFIER)) {
@@ -149,7 +164,7 @@ public class BridgeSmoke implements ModInitializer {
                 }
                 if (culled < 5) throw new AssertionError("Culling not applied: " + culled);
                 System.out.println("HYDRAULIC CULLING SMOKE PASS: " + culled + " cube components have culling rules.");
-                if (frameBlocks != 4) throw new AssertionError("Missing portal frame mappings: " + frameBlocks);
+                if (frameBlocks != 5) throw new AssertionError("Missing portal frame mappings: " + frameBlocks);
                 String key = "advancement.the_sift.story.brave_the_unknown.title";
                 String translation = org.geysermc.geyser.text.MinecraftLocale.getLocaleStringIfPresent(key, "en_us");
                 if (!"Brave the Unknown".equals(translation)) throw new AssertionError("Advancement title not translated: " + translation);
