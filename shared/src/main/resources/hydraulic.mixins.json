@@ -13,6 +13,8 @@
     "ext.WorldBlockStatesMixin",
     "ext.ModTranslationsMixin",
     "ext.BlockCullingMixin",
+    "ext.SessionTrafficMixin",
+    "ext.PacketErrorDiagnosticsMixin",
     "NativePacketsMixin"
   ],
   "injectors": {

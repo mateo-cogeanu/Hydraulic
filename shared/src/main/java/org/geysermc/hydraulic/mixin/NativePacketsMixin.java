@@ -19,6 +19,7 @@ public class NativePacketsMixin {
             at = @At(value = "INVOKE", target = "Lnet/minecraft/network/Connection;send(Lnet/minecraft/network/protocol/Packet;Lio/netty/channel/ChannelFutureListener;Z)V"))
     private void hydraulic$bridge(Connection connection, Packet<?> packet, ChannelFutureListener listener, boolean flush, Operation<Void> original) {
         if ((Object) this instanceof ServerGamePacketListenerImpl game && GeyserApi.api().connectionByUuid(game.player.getUUID()) instanceof GeyserSession session) {
+            ((org.geysermc.hydraulic.compat.SessionTrafficAccess)session).hydraulic$traffic().record(session, "native", packet);
             packet = NativePacketBridge.remap(packet, game.player, session);
         }
         if (packet != null) original.call(connection, packet, listener, flush);

@@ -26,6 +26,9 @@ public class BridgeSmoke implements ModInitializer {
             if (!done.compareAndSet(false, true)) return;
             try {
                 var player = new ServerPlayer(server, server.overworld(), new GameProfile(UUID.randomUUID(), "HydraulicProbe"), ClientInformation.createDefault());
+                if (!org.geysermc.hydraulic.compat.SessionTrafficAccess.class.isAssignableFrom(org.geysermc.geyser.session.GeyserSession.class)) throw new AssertionError("Session traffic mixin missing");
+                Class.forName("org.geysermc.geyser.session.GeyserSessionAdapter");
+                System.out.println("HYDRAULIC TRAFFIC MIXIN SMOKE PASS: upstream and decode diagnostic hooks applied.");
                 int entities = 0, appearances = 0, sounds = 0;
                 if (NativePacketBridge.MOD_PARTICLES_ENABLED) throw new AssertionError("Diagnostic particles unexpectedly enabled");
                 int filteredParticles = 0;
