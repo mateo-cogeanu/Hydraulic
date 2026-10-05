@@ -192,7 +192,7 @@ The pack audit now rejects this exact empty-mesh representation. It fails on the
 
 Replace only Hydraulic, restart and accept the regenerated Bedrock pack. Keep `sift-face-culling: true` on the phone after the previous comparison.
 
-## Current preview: built-in voxel registry and remaining model errors (2026-10-05)
+## Earlier preview: built-in voxel registry and remaining model errors (2026-10-05)
 
 The user confirms that the empty-texture-mesh repair restores visibility. The next client log reports missing/invalid `minecraft:empty` and `minecraft:unit_cube` voxel-shape handles, missing Overgrown Willow boat geometries, and two out-of-bounds hanging-sign boxes. These are concrete remaining compatibility errors; the command keyword/panda warnings and the memory termination have not been established as consequences of them.
 
@@ -203,3 +203,13 @@ Minecraft 26.3 hanging-sign templates contain multi-axis element rotations, incl
 68 regression tests pass. Fresh/cached runtime checks include the login voxel hook and protocol wire round-trip; the generated-pack audit requires both explicit boat models, paired hanging-sign rotations, all 507 multipart models, no rejected empty mesh arrays, and retained entity/armor/effect assets. The original Sift and all other shipped mods remain unchanged. Replace only Hydraulic, restart, accept the regenerated pack and keep `sift-face-culling: true`.
 
 The absence of the shape entries is verified on the server; resolution of the client warning, boat/sign appearance and phone memory crash remains a client retest. This patch does not claim a verified crash fix. The supplied command keyword warnings and panda asset error remain unaddressed: the generated Sift pack contains no panda entity file, and blindly changing Java command casing could change their meaning.
+
+## Current preview: original portal cloud field (2026-10-05)
+
+The user reports that the preceding registry/culling repair fixes the lag and asks for a portal appearance as close to the original as possible. The earlier procedural substitute used a dark-blue palette and artificial stars; The Sift's `assets/the_sift/shaders/include/portal_fields.glsl` instead produces layered white/turquoise mist.
+
+The portal atlas now bakes that shader's five-octave noise, domain warp, far/middle/near layer weights, original white/turquoise colors, haze and layer velocities at a neutral view offset. The GLSL matrix uses column-major multiplication. A narrow blend along opposite edges makes the tile seamless, and a smooth crossfade with a previous-period field makes the animation loop continuous. This is a fixed-view texture approximation: the original camera-dependent screen projection, parallax and shader fog remain client shader effects that ordinary Bedrock custom-block textures cannot reproduce. Floating-point shader implementations can also differ from the conversion-time arithmetic.
+
+Frames increase to 64×64 pixels for cloud detail while remaining at sixteen frames and three ticks per frame. The opaque 64×1024 atlas is bounded to 256 KiB of decoded RGBA; generating the noise occurs once during pack conversion, not on the phone or per server tick. Block geometry, unit-cube shape, culling, light emission, native states, entities, animations, sounds, particle budgets and view-distance rules remain unchanged. All prior lag and visibility repairs are retained.
+
+70 regression tests pass, including independent original-shader reference values, matching opposite tile edges and preservation of the original white/turquoise palette. Pack and fresh/cached bridge audits retain the voxel login hook/wire roundtrip and native state/chunk checks. Replace only Hydraulic, restart and accept the regenerated pack. The portal appearance still requires the user's Bedrock review; no additional measured frame-rate claim is made.

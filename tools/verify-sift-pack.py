@@ -114,7 +114,7 @@ with ZipFile(sys.argv[1]) as pack:
     import struct
     bitmap = pack.read('textures/hydraulic/the_sift/portal.png')
     assert bitmap.startswith(b'\x89PNG')
-    assert struct.unpack('>II', bitmap[16:24]) == (32, 512)
+    assert struct.unpack('>II', bitmap[16:24]) == (64, 1024)
     culling = json.loads(pack.read('block_culling/hydraulic_solid_cube.json'))['minecraft:block_culling_rules']
     assert culling['description']['identifier'] == 'hydraulic:solid_cube'
     assert len(culling['rules']) == 6
@@ -128,7 +128,7 @@ with ZipFile(sys.argv[1]) as pack:
     for flipbook in flipbooks:
         bitmap = pack.read(flipbook['flipbook_texture'] + '.png')
         portal = flipbook['flipbook_texture'].endswith('/portal')
-        assert struct.unpack('>II', bitmap[16:24]) == ((32, 512) if portal else (32, 1024))
+        assert struct.unpack('>II', bitmap[16:24]) == ((64, 1024) if portal else (32, 1024))
         assert flipbook['ticks_per_frame'] == (3 if portal else 10)
     terrain = json.loads(pack.read('textures/terrain_texture.json'))['texture_data']
     for definition in terrain.values():
