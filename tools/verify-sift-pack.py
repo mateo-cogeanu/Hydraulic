@@ -72,6 +72,7 @@ with ZipFile(sys.argv[1]) as pack:
                 geometries[geometry['description']['identifier']] = geometry
                 if name.startswith('models/blocks/'):
                     for bone in geometry.get('bones', []):
+                        assert bone.get('texture_meshes') != [], f'Bedrock-rejected empty texture_meshes: {name}'
                         for cube in bone.get('cubes', []):
                             assert cube.get('uv') != {}, f'Invisible cube with empty faces: {name}'
                     identifier = geometry['description']['identifier']

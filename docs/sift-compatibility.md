@@ -172,7 +172,7 @@ The user reports that the complete explicit-cube build looks unchanged. Therefor
 
 The unshipped probe now verifies Bedrock block-palette serialization in addition to native section decoding/remapping: all 786,432 positions across four chunks and three palettes encode/decode exactly, including XZY coordinate conversion. This checks runtime IDs in block-storage payloads; it does not cover the client's renderer, occlusion mesh, resource-pack cache or the entire live session transport. Enabled/disabled culling startup checks verify that the toggle respectively includes/omits the culling component, with unchanged models and state coverage. This is a diagnostic comparison, not a claim that the terrain defect is fixed.
 
-## Current preview: complete base block presentations (2026-10-04)
+## Earlier preview: complete base block presentations (2026-10-04)
 
 The user confirms that Siftslate is invisible even when newly placed, with face culling enabled or disabled. That result excludes the added neighbor-face culling component as a sufficient explanation. The Siftslate PNG is present and fully opaque.
 
@@ -181,3 +181,13 @@ The exporter previously assigned model/material components to the base only when
 Live checks require geometry/materials on every modeled native default and verify all six Siftslate face materials against its opaque texture. The additional base presentations bring components with culling from 977 to 1,010; all 4,614 modeled-state conditions and 14,139 palette lookups remain valid. The 262,144 native chunk and 786,432 Bedrock palette wire checks, 62 regression tests and generated-pack audit pass on fresh/cached startup. Singer models/animations, other entities, armor, effects and sounds remain unchanged.
 
 Replace only Hydraulic and restart. Restore `sift-face-culling: true` in `config/hydraulic/config.yml` after the earlier comparison; that setting is retained rather than overwritten. Accept the regenerated resource pack.
+
+## Current preview: omit rejected empty texture meshes (2026-10-05)
+
+The supplied Bedrock Content Log reports `bones | texture_meshes | Required child not found`, followed by `geometry file didn't validate` and missing geometry assets for fences, glass panes, hanging roots, foliage and slabs. Its excerpt identifies 25 rejected model files. The preceding generated pack contains `texture_meshes: []` on 2,041 bones across 643 block-model files. These arrays are produced by serializing PackConverter's optional mesh collections even when the models contain only cubes. The client's rejection is direct evidence of a generated-content failure; earlier registry and reference audits did not validate that field against the client's loader.
+
+Hydraulic now omits only empty `texture_meshes` arrays in exported ordinary and combined multipart block models. Populated texture meshes remain; cube faces, UVs, materials, bones, parent relationships, rotations, multipart pieces and culling rules remain. The original Sift, Geyser, Floodgate and other shipped mods are unchanged. Singer and other entity assets remain intact. No content is hidden or removed. The explicit opaque animated portal and complete base block presentations remain.
+
+The pack audit now rejects this exact empty-mesh representation. It fails on the preceding pack and passes on the new pack, which contains zero empty texture-mesh arrays in block geometries. Two regression tests cover preservation of source data, cubes, actual populated meshes and unrelated fields; all 64 tests pass. Fresh/cached startup and bridge checks retain all state, chunk, Bedrock palette, base-face-material and entity/sound audits. All 507 combined multipart geometries remain. This fixes the specific geometry rejection shown in the log, but the excerpt does not establish that every invisible block or the phone memory termination shares that cause. The client must retest and provide any remaining Content Log errors.
+
+Replace only Hydraulic, restart and accept the regenerated Bedrock pack. Keep `sift-face-culling: true` on the phone after the previous comparison.
