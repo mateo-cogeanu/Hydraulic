@@ -22,9 +22,16 @@ public final class IchorFluidLayer {
             boolean ichor=palette.getPalette() instanceof org.geysermc.mcprotocollib.protocol.data.game.chunk.palette.GlobalPalette;
             for(int i=0;!ichor && i<palette.getPalette().size();i++) if(LEVELS.containsKey(palette.getPalette().idToState(i))) {ichor=true;break;}
             if(!ichor && !(palette.getPalette() instanceof org.geysermc.mcprotocollib.protocol.data.game.chunk.palette.GlobalPalette))continue;
+            var layers = sections[bedrock].getBlockStorageArray();
+            boolean copied = false;
             for(int x=0;x<16;x++) for(int y=0;y<16;y++) for(int z=0;z<16;z++) {
                 int id=palette.get(x,y,z);if(!LEVELS.containsKey(id))continue;
-                sections[bedrock].getBlockStorageArray()[1].setFullBlock((x<<8)|(z<<4)|y,fluid(mappings,id).getRuntimeId());
+                int index=(x<<8)|(z<<4)|y, runtime=fluid(mappings,id).getRuntimeId();
+                if(layers[1].getFullBlock(index)==runtime)continue;
+                // Geyser constructs water layers with immutable singleton/two-entry palettes.
+                // Copy lazily before adding a depth, retaining every non-Ichor cell.
+                if(!copied) { layers[1]=layers[1].copy(); copied=true; }
+                layers[1].setFullBlock(index,runtime);
             }
         }
     }

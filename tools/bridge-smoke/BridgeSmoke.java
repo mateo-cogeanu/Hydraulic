@@ -113,6 +113,33 @@ public class BridgeSmoke implements ModInitializer {
                     if(!items.getBuckets().contains(items.getMapping(BuiltInRegistries.ITEM.getId(bucket)).getClass().getMethod("getBedrockDefinition").invoke(items.getMapping(BuiltInRegistries.ITEM.getId(bucket)))))throw new AssertionError("Ichor bucket omitted from native-use path");
                 }
                 if(org.geysermc.hydraulic.block.IchorFluidLayer.LEVELS.size()!=16)throw new AssertionError("Incomplete Ichor fluid states");
+                int fluidChunkChecks = 0;
+                for(var blocks:org.geysermc.geyser.registry.BlockRegistries.BLOCKS.get().values()) {
+                    Object waterDefinition=blocks.getClass().getMethod("getBedrockWater").invoke(blocks);
+                    int air=blocks.getBedrockAir().getRuntimeId(), water=(int)waterDefinition.getClass().getMethod("getRuntimeId").invoke(waterDefinition);
+                    var nativePalette=org.geysermc.mcprotocollib.protocol.data.game.chunk.DataPalette.createForBlockState(0,65536);
+                    for(var entry:org.geysermc.hydraulic.block.IchorFluidLayer.LEVELS.entrySet())nativePalette.set(entry.getValue(),0,0,entry.getKey());
+                    for(boolean singleton:new boolean[]{false,true}) {
+                        var bits=singleton?org.geysermc.geyser.level.chunk.bitarray.SingletonBitArray.INSTANCE:
+                                org.geysermc.geyser.level.chunk.bitarray.BitArrayVersion.V1.createArray(4096);
+                        var original=new org.geysermc.geyser.level.chunk.BlockStorage(bits,singleton?
+                                it.unimi.dsi.fastutil.ints.IntLists.singleton(water):it.unimi.dsi.fastutil.ints.IntList.of(air,water));
+                        if(!singleton)for(int x=0;x<16;x++)bits.set(x<<8,1);
+                        var first=new org.geysermc.geyser.level.chunk.BlockStorage(air);
+                        var section=new org.geysermc.geyser.level.chunk.GeyserChunkSection(new org.geysermc.geyser.level.chunk.BlockStorage[]{first,original},0);
+                        org.geysermc.hydraulic.block.IchorFluidLayer.apply(blocks,new org.geysermc.mcprotocollib.protocol.data.game.chunk.DataPalette[]{nativePalette},
+                                new org.geysermc.geyser.level.chunk.GeyserChunkSection[]{section},0);
+                        for(var entry:org.geysermc.hydraulic.block.IchorFluidLayer.LEVELS.entrySet()) {
+                            Object fluid=org.geysermc.hydraulic.block.IchorFluidLayer.class.getMethod("fluid",org.geysermc.geyser.registry.type.BlockMappings.class,int.class).invoke(null,blocks,entry.getKey());
+                            int expected=(int)fluid.getClass().getMethod("getRuntimeId").invoke(fluid);
+                            if(section.getBlockStorageArray()[1].getFullBlock(entry.getValue()<<8)!=expected)throw new AssertionError("Ichor chunk depth lost");
+                            if(original.getFullBlock(entry.getValue()<<8)!=water)throw new AssertionError("Original immutable water layer changed");
+                            fluidChunkChecks++;
+                        }
+                        if(section.getBlockStorageArray()[0]!=first || section.getBlockStorageArray()[1].getFullBlock(1)!=(singleton?water:air))throw new AssertionError("Non-Ichor cell changed");
+                    }
+                }
+                System.out.println("HYDRAULIC ICHOR CHUNK SMOKE PASS: "+fluidChunkChecks+" depth checks with immutable singleton/two-entry water palettes; original layers and non-Ichor cells preserved.");
                 for(var entry:org.geysermc.hydraulic.block.IchorFluidLayer.LEVELS.entrySet()) {
                     if(org.geysermc.hydraulic.block.JavaBlockStateRemapper.translate(entry.getKey())!=entry.getKey())throw new AssertionError("Ichor visual still maps to vanilla water");
                     for(var blocks:org.geysermc.geyser.registry.BlockRegistries.BLOCKS.get().values()) {
