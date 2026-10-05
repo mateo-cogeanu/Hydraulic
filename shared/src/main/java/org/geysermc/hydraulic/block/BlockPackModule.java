@@ -181,6 +181,7 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                     var converted = ModelConverter.INSTANCE.convert(stitched, new ConversionContext(context.mod().name(), new PackLogListener(context.logger())));
                     if (converted == null) continue;
                     JsonObject document = BlockGeometryJson.forExport(new Gson().toJsonTree(converted.model()).getAsJsonObject());
+                    ElementEulerRotations.apply(document, model, context.modelProvider());
                     bedrockPack.addExtraFile(document, "models/blocks/" + converted.fileName());
                     exportCulling(bedrockPack, document);
                 } catch (Exception e) { throw new IllegalStateException("Could not export culled Sift model " + model.key(), e); }
@@ -203,6 +204,9 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
                     JsonObject partGeometry = new Gson().toJsonTree(converted.model()).getAsJsonObject()
                             .getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
                     if (geometry == null) geometry = partGeometry.deepCopy();
+                    JsonObject partDocument = new JsonObject();
+                    JsonArray partGeometries = new JsonArray(); partGeometries.add(partGeometry); partDocument.add("minecraft:geometry", partGeometries);
+                    ElementEulerRotations.apply(partDocument, part.model(), context.modelProvider());
                     JsonObject rootBone = new JsonObject();
                     rootBone.addProperty("name", prefix + "root");
                     rootBone.add("pivot", new Gson().toJsonTree(new float[]{0, 8, 0}));

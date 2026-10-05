@@ -72,6 +72,30 @@ public class BridgeSmoke implements ModInitializer {
                 serverViewField.setInt(sessionFixture, -1);
                 if ((int) renderMethod.invoke(sessionFixture) != 2) throw new AssertionError("Initial view changed");
                 System.out.println("HYDRAULIC MOBILE VIEW SMOKE PASS: live Geyser mixin caps the Sift on every Bedrock OS, restores Overworld distance and handles login defaults.");
+                String protocolPrefix = "org.geysermc.geyser.shaded.org.cloudburstmc.protocol.bedrock.";
+                var voxelClass = Class.forName(protocolPrefix + "packet.VoxelShapesPacket");
+                var voxelPacket = voxelClass.getDeclaredConstructor().newInstance();
+                voxelClass.getMethod("setShapes", List.class).invoke(voxelPacket, new java.util.ArrayList<>());
+                voxelClass.getMethod("setNameMap", Map.class).invoke(voxelPacket, new java.util.HashMap<>());
+                var voxelHook = java.util.Arrays.stream(sessionClass.getDeclaredMethods())
+                        .filter(method -> method.getName().contains("supplyBuiltinVoxelShapes")).findFirst().orElseThrow();
+                voxelHook.setAccessible(true); voxelHook.invoke(sessionFixture, voxelPacket);
+                var shapeList = (List<?>) voxelClass.getMethod("getShapes").invoke(voxelPacket);
+                var shapeNames = (Map<?,?>) voxelClass.getMethod("getNameMap").invoke(voxelPacket);
+                if (shapeList.size() != 2 || !shapeNames.keySet().containsAll(List.of("minecraft:empty", "minecraft:unit_cube"))) throw new AssertionError("Built-in voxel registry not supplied");
+                var voxelCodec = Class.forName(protocolPrefix + "codec.v2193.Bedrock_v2193").getField("CODEC").get(null);
+                var helperClass = Class.forName(protocolPrefix + "codec.BedrockCodecHelper");
+                var packetClass = Class.forName(protocolPrefix + "packet.BedrockPacket");
+                var voxelBuffer = Unpooled.buffer();
+                try {
+                    var codecHelper = voxelCodec.getClass().getMethod("createHelper").invoke(voxelCodec);
+                    voxelCodec.getClass().getMethod("tryEncode", helperClass, io.netty.buffer.ByteBuf.class, packetClass).invoke(voxelCodec, codecHelper, voxelBuffer, voxelPacket);
+                    var definition = voxelCodec.getClass().getMethod("getPacketDefinition", Class.class).invoke(voxelCodec, voxelClass);
+                    int packetId = (int) definition.getClass().getMethod("getId").invoke(definition);
+                    var decodedVoxel = voxelCodec.getClass().getMethod("tryDecode", helperClass, io.netty.buffer.ByteBuf.class, int.class).invoke(voxelCodec, codecHelper, voxelBuffer, packetId);
+                    if (!decodedVoxel.equals(voxelPacket) || voxelBuffer.isReadable()) throw new AssertionError("Voxel registry wire mismatch");
+                } finally { voxelBuffer.release(); }
+                System.out.println("HYDRAULIC VOXEL REGISTRY SMOKE PASS: login mixin supplies both built-ins; protocol 2193 wire round trip passed.");
                 int entities = 0, appearances = 0, sounds = 0;
                 Class.forName("org.geysermc.geyser.translator.protocol.java.JavaRespawnTranslator");
                 int filteredParticles = 0;

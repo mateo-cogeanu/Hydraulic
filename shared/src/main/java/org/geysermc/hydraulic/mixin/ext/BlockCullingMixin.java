@@ -21,6 +21,7 @@ public class BlockCullingMixin {
         NbtMap result = cir.getReturnValue();
         NbtMap geometry = result.getCompound("minecraft:geometry").toBuilder()
                 .putString("culling", id.equals(StructureGeometry.IDENTIFIER) ? StructureGeometry.CULLING : org.geysermc.hydraulic.block.GeometryCulling.identifier(id)).build();
+        if (id.equals(StructureGeometry.IDENTIFIER)) geometry = geometry.toBuilder().putString("culling_shape", "minecraft:unit_cube").build();
         cir.setReturnValue(result.toBuilder().putCompound("minecraft:geometry", geometry).build());
     }
 }

@@ -16,6 +16,15 @@ public class ModelSerializerMixin {
         return org.geysermc.hydraulic.block.ImplicitModelUvs.normalize(source);
     }
 
+    @org.spongepowered.asm.mixin.injection.Inject(
+        method = "deserializeFromJson(Lcom/google/gson/JsonElement;Lnet/kyori/adventure/key/Key;Lteam/unnamed/creative/metadata/pack/PackFormat;)Lteam/unnamed/creative/model/Model;",
+        at = @At("HEAD"))
+    private void hydraulic$captureEulerRotations(com.google.gson.JsonElement source, net.kyori.adventure.key.Key key,
+        team.unnamed.creative.metadata.pack.PackFormat format,
+        org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<team.unnamed.creative.model.Model> cir) {
+        org.geysermc.hydraulic.block.ElementEulerRotations.capture(source, key);
+    }
+
     @Redirect(
         method = "deserializeFromJson(Lcom/google/gson/JsonElement;Lnet/kyori/adventure/key/Key;Lteam/unnamed/creative/metadata/pack/PackFormat;)Lteam/unnamed/creative/model/Model;",
         at = @At(

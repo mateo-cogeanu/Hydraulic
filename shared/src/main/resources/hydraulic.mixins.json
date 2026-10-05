@@ -13,6 +13,7 @@
     "ext.WorldBlockStatesMixin",
     "ext.ModTranslationsMixin",
     "ext.BlockCullingMixin",
+    "ext.VoxelShapesMixin",
     "ext.SessionTrafficMixin",
     "ext.MobileViewDistanceMixin",
     "ext.DimensionViewDistanceMixin",

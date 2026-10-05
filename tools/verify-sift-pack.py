@@ -101,6 +101,14 @@ with ZipFile(sys.argv[1]) as pack:
     for name in attachables:
         description = json.loads(pack.read(name))['minecraft:attachable']['description']
         assert description['geometry']['default'] in geometries, f'Missing armor geometry: {name}'
+    for boat in ('overgrown_willow_boat', 'overgrown_willow_chest_boat'):
+        assert 'geometry.hydraulic.the_sift.' + boat in geometries, f'Missing explicit boat geometry: {boat}'
+    sign = geometries['geometry.the_sift.overgrown_willow_hanging_sign_rot_3']
+    for bone in sign['bones']:
+        for cube in bone.get('cubes', []):
+            rotation = cube.get('rotation', [0, 0, 0])
+            if abs(rotation[0]) == 180:
+                assert abs(rotation[2]) == 180, 'Hanging-sign chain lost its cancelling Z rotation'
     assert 'geometry.hydraulic.structure_cube' in geometries
     assert 'geometry.hydraulic.sift_portal' not in geometries
     import struct

@@ -116,7 +116,10 @@ public class EntityPackModule extends PackModule<EntityPackModule> {
             String geometry = profile.builtinGeometry();
             JsonObject animations = null;
             try {
-                if (geometry == null) {
+                if (("geometry.boat".equals(geometry) || "geometry.chest_boat".equals(geometry)) && context.mod().namespace().equals("the_sift")) {
+                    geometry = "geometry.hydraulic.the_sift." + name;
+                    context.bedrockResourcePack().addExtraFile(JavaBoatGeometry.create(geometry, name.endsWith("chest_boat")), "models/entity/" + name + ".geo.json");
+                } else if (geometry == null) {
                     geometry = "geometry.hydraulic." + context.mod().namespace() + "." + name;
                     var model = read(context.mod(), "geckolib/models/entity/" + profile.modelName() + ".geo.json");
                     context.bedrockResourcePack().addExtraFile(GeckoAssets.geometry(model, geometry), "models/entity/" + name + ".geo.json");
