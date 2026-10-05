@@ -8,6 +8,7 @@
     "ext.ItemTranslatorMixin",
     "ext.BucketItemsMixin",
     "ext.RecipeNetworkIdsMixin",
+    "ext.SiftBiomeExperimentsMixin",
     "ext.IchorFluidUpdatesMixin",
     "ext.IchorBulkUpdatesMixin",
     "ext.MinecraftResourcePackReaderImplMixin",

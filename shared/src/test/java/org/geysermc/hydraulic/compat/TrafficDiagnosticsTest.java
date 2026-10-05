@@ -2,6 +2,19 @@ package org.geysermc.hydraulic.compat;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 class TrafficDiagnosticsTest {
+    @Test void shortDisconnectRetainsBoundedRecentPacketSummaries() {
+        var counters=new TrafficDiagnostics();
+        for(int i=0;i<30;i++)counters.detail("packet"+i);
+        counters.record("native","Chunk",100,1_000_000_000L);
+        counters.error();
+        String summary=counters.disconnectSummary();
+        assertFalse(summary.contains("packet5,"));
+        assertTrue(summary.contains("packet6,"));
+        assertTrue(summary.contains("packet29"));
+        assertTrue(summary.contains("decodeErrors=1"));
+        assertTrue(summary.contains("nativeChunkBytes=100"));
+    }
+
     @Test void countsClearBetweenFiveSecondReports() {
         var counters = new TrafficDiagnostics();
         assertNull(counters.record("native", "Chunk", 100, 1_000_000_000L));

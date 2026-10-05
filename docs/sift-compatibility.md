@@ -248,3 +248,14 @@ The iPhone content log rejects `custom_direction` as the billboard direction mod
 The recipe collisions come from Geyser's lazy initialization of four cartography recipes after its session recipe counter has been constructed. Hydraulic's session-constructor hook initializes those built-ins and raises the next dynamic ID above reserved IDs before trim/stonecutter recipes are allocated. It does not change Java recipe identifiers or outputs. The runtime probe exercises the injected hook, checks all four reserved map IDs, and ensures repeated reservation never rewinds the counter. This correction remains inside Hydraulic. The separate camel-case command and vanilla panda resource warnings are not changed by this patch; the provided server log does not establish them as a disconnect cause.
 
 75 regression tests, generated-pack audits and fresh/cached runtime checks are required for this revision. Client acceptance and remaining disconnect diagnosis still need a new Bedrock test.
+
+
+### InitialConnection-90 / Block login investigation (2026-10-05)
+
+The user's screenshot is a Bedrock connection failure, not a content-log search instruction. The error code alone does not identify a block or a packet, and the latest provided server log shows a client-initiated disconnect after roughly two seconds. The previous five-second traffic window omitted that connection's useful details.
+
+A concrete login mismatch was found: ten custom Sift biome definitions and IDs were sent, but Geyser's StartGame experiments only enabled custom items, upcoming creator features and experimental Molang. Hydraulic now adds the Custom Biomes (`data_driven_biomes`) experiment when its dedicated Sift biome definitions are present. Microsoft's [custom biome tutorial](https://learn.microsoft.com/en-us/minecraft/creator/documents/biomes/custombiometutorial?view=minecraft-bedrock-stable) documents the toggle for custom-biome rendering. This repairs the advertised capability; the screenshot does not prove this mismatch caused the user's disconnect.
+
+Hydraulic also logs one bounded disconnect snapshot even before five seconds: login experiments, custom-biome count, pending decode errors/chunk bytes and the latest 24 translated Bedrock packet summaries. Only packet kinds and small structural counts/lengths are retained, never full packets, item contents, credentials or payload buffers. The native vanilla command/panda content warnings are unchanged.
+
+76 regression tests pass. Fresh/cached live checks verify the injected experiment and short-disconnect hooks alongside all previous mapping and pack audits. Join acceptance on the user's iPhone still needs retesting; no confirmed client fix is claimed.

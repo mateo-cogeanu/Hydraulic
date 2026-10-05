@@ -90,6 +90,24 @@ public class BridgeSmoke implements ModInitializer {
                 if ((int) renderMethod.invoke(sessionFixture) != 2) throw new AssertionError("Initial view changed");
                 System.out.println("HYDRAULIC MOBILE VIEW SMOKE PASS: live Geyser mixin caps the Sift on every Bedrock OS, restores Overworld distance and handles login defaults.");
                 String protocolPrefix = "org.geysermc.geyser.shaded.org.cloudburstmc.protocol.bedrock.";
+                var diagnosticsField = sessionClass.getDeclaredField("hydraulic$diagnostics");
+                diagnosticsField.setAccessible(true);
+                diagnosticsField.set(sessionFixture, new org.geysermc.hydraulic.compat.TrafficDiagnostics());
+                var startClass = Class.forName(protocolPrefix+"packet.StartGamePacket");
+                Object startPacket = startClass.getConstructor().newInstance();
+                var experimentMethod = sessionClass.getDeclaredMethod("configureExperiments", startClass);
+                experimentMethod.setAccessible(true);
+                experimentMethod.invoke(sessionFixture,startPacket);
+                var experiments = (java.util.List<?>) startClass.getMethod("getExperiments").invoke(startPacket);
+                int customBiomesEnabled=0;
+                for(Object experiment:experiments) {
+                    if(experiment.getClass().getMethod("getName").invoke(experiment).equals("data_driven_biomes")
+                            && (boolean)experiment.getClass().getMethod("isEnabled").invoke(experiment))customBiomesEnabled++;
+                }
+                if(customBiomesEnabled!=1)throw new AssertionError("Custom Sift biomes sent without their login experiment");
+                if(!((org.geysermc.hydraulic.compat.SessionTrafficAccess)sessionFixture).hydraulic$traffic().disconnectSummary().contains("customBiomeCount=10"))throw new AssertionError("Login diagnostic snapshot missing");
+                if(java.util.Arrays.stream(sessionClass.getDeclaredMethods()).noneMatch(method->method.getName().contains("hydraulic$reportDisconnect")))throw new AssertionError("Short disconnect diagnostic hook missing");
+                System.out.println("HYDRAULIC LOGIN EXPERIMENT SMOKE PASS: ten custom biomes have the required StartGame experiment; short-disconnect hook and settings snapshot applied.");
                 var voxelClass = Class.forName(protocolPrefix + "packet.VoxelShapesPacket");
                 var voxelPacket = voxelClass.getDeclaredConstructor().newInstance();
                 voxelClass.getMethod("setShapes", List.class).invoke(voxelPacket, new java.util.ArrayList<>());

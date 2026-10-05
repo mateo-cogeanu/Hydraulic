@@ -10,6 +10,23 @@ public final class TrafficDiagnostics {
     private static final Logger LOGGER = LoggerFactory.getLogger("Hydraulic/Traffic");
     private final Map<String, Long> counts = new HashMap<>();
     private long windowStart;
+    private final java.util.ArrayDeque<String> recent = new java.util.ArrayDeque<>();
+    private boolean disconnectReported;
+    private String loginSettings="not captured";
+    public synchronized void loginSettings(String settings) { loginSettings=settings; }
+    public synchronized void detail(String summary) {
+        if(recent.size()==24) recent.removeFirst();
+        recent.addLast(summary);
+    }
+    public synchronized String disconnectSummary() {
+        return "loginSettings="+loginSettings+" decodeErrors="+errors+" nativeChunkBytes="+chunkBytes+" recentTranslatedPackets="+recent;
+    }
+    public synchronized void disconnect(org.geysermc.geyser.session.GeyserSession session) {
+        if(disconnectReported) return;
+        disconnectReported=true;
+        LOGGER.info("Hydraulic disconnect diagnostic: protocol={} world={} {}", session.getUpstream().getProtocolVersion(), session.getWorldName(), disconnectSummary());
+    }
+
     private long chunkBytes;
     private int errors;
     private int reportedErrors;
@@ -40,6 +57,15 @@ public final class TrafficDiagnostics {
         if (packet instanceof net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket chunk) {
             var buffer = chunk.chunkData().getReadBuffer();
             try { bytes = buffer.readableBytes(); } finally { buffer.release(); }
+        }
+        if(direction.equals("bedrock")) {
+            String type=packet.getClass().getSimpleName();
+            String extra="";
+            if(packet instanceof org.cloudburstmc.protocol.bedrock.packet.StartGamePacket start) extra=" experiments="+start.getExperiments()+" blockDefinitions="+start.getBlockProperties().size();
+            else if(packet instanceof org.cloudburstmc.protocol.bedrock.packet.BiomeDefinitionListPacket biomes) extra=" biomeDefinitions="+biomes.getBiomes().getDefinitions().size();
+            else if(packet instanceof org.cloudburstmc.protocol.bedrock.packet.LevelChunkPacket chunk) extra=" chunk="+chunk.getChunkX()+","+chunk.getChunkZ()+" sections="+chunk.getSubChunksLength()+" bytes="+chunk.getData().readableBytes();
+            else if(packet instanceof org.cloudburstmc.protocol.bedrock.packet.BossEventPacket boss) extra=" titleLength="+(boss.getTitle()==null?0:boss.getTitle().length());
+            detail(type+extra);
         }
         String report = record(direction, packet.getClass().getSimpleName(), bytes, System.nanoTime());
         if (report != null) {

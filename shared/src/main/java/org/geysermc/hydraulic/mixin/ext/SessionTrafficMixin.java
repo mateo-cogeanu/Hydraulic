@@ -16,4 +16,9 @@ public class SessionTrafficMixin implements SessionTrafficAccess {
     private void hydraulic$countUpstream(BedrockPacket packet, CallbackInfo ci) {
         hydraulic$diagnostics.record((GeyserSession)(Object)this, "bedrock", packet);
     }
+    @Inject(method = "disconnect(Lnet/kyori/adventure/text/Component;)V", at = @At("HEAD"))
+    private void hydraulic$reportDisconnect(net.kyori.adventure.text.Component reason, CallbackInfo ci) {
+        hydraulic$diagnostics.disconnect((GeyserSession)(Object)this);
+    }
 }
+
