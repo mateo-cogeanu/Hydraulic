@@ -14,5 +14,7 @@ public class HydraulicFabricMod implements ModInitializer {
         this.hydraulic = HydraulicImpl.load(HydraulicPlatform.FABRIC, new HydraulicFabricBootstrap());
 
         ServerLifecycleEvents.SERVER_STARTING.register(this.hydraulic::onServerStarting);
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(org.geysermc.hydraulic.compat.SiftClientEffects::tick);
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> org.geysermc.hydraulic.compat.SiftClientEffects.clear());
     }
 }

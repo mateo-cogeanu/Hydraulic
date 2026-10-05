@@ -17,7 +17,7 @@ public class BlockCullingMixin {
         if (!org.geysermc.hydraulic.HydraulicImpl.instance().getConfig().siftFaceCulling()) return;
         if (components == null || components.geometry() == null) return;
         String id = components.geometry().identifier();
-        if (!id.equals(StructureGeometry.IDENTIFIER) && !id.startsWith("geometry.the_sift.")) return;
+        if (!id.equals(StructureGeometry.IDENTIFIER) && !id.startsWith("geometry.the_sift.") && !id.startsWith(org.geysermc.hydraulic.block.IchorPresentation.PREFIX)) return;
         NbtMap result = cir.getReturnValue();
         NbtMap geometry = result.getCompound("minecraft:geometry").toBuilder()
                 .putString("culling", id.equals(StructureGeometry.IDENTIFIER) ? StructureGeometry.CULLING : org.geysermc.hydraulic.block.GeometryCulling.identifier(id)).build();

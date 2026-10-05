@@ -60,6 +60,24 @@ public class ComponentConverter {
         addSimpleConversion(DataComponents.MAX_DAMAGE, JavaItemDataComponents.MAX_DAMAGE);
         addSimpleConversion(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, JavaItemDataComponents.ENCHANTMENT_GLINT_OVERRIDE);
 
+        addComponentConversion(DataComponents.ATTACK_RANGE, (component, map, definition, options) ->
+                definition.component(JavaItemDataComponents.ATTACK_RANGE, JavaAttackRange.builder()
+                        .minReach(component.minReach()).maxReach(component.maxReach())
+                        .minCreativeReach(component.minCreativeReach()).maxCreativeReach(component.maxCreativeReach())
+                        .hitboxMargin(component.hitboxMargin())));
+        addComponentConversion(DataComponents.KINETIC_WEAPON, (component, map, definition, options) -> {
+            var weapon = JavaKineticWeapon.builder().delayTicks(component.delayTicks());
+            component.dismountConditions().ifPresent(condition -> weapon.dismountConditions(
+                    JavaKineticWeapon.condition(condition.maxDurationTicks(), condition.minSpeed(), condition.minRelativeSpeed())));
+            definition.component(JavaItemDataComponents.KINETIC_WEAPON, weapon);
+        });
+        addComponentConversion(DataComponents.PIERCING_WEAPON, (component, map, definition, options) ->
+                definition.component(JavaItemDataComponents.PIERCING_WEAPON, JavaPiercingWeapon.instance()));
+        addComponentConversion(DataComponents.USE_EFFECTS, (component, map, definition, options) ->
+                definition.component(JavaItemDataComponents.USE_EFFECTS, JavaUseEffects.of(component.speedMultiplier())));
+        addComponentConversion(DataComponents.ATTACK_ANIMATION, (component, map, definition, options) ->
+                definition.component(JavaItemDataComponents.ATTACK_ANIMATION, JavaSwingAnimation.of(component.duration())));
+
         // These components are a little different or too complex, so we need a more powerful conversion
         addComponentConversion(DataComponents.FOOD, (component, map, definition, options) -> {
             definition.component(

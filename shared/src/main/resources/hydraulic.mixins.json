@@ -6,6 +6,9 @@
   "mixins": [
     "ext.BlockStateSerializerMixin",
     "ext.ItemTranslatorMixin",
+    "ext.BucketItemsMixin",
+    "ext.IchorFluidUpdatesMixin",
+    "ext.IchorBulkUpdatesMixin",
     "ext.MinecraftResourcePackReaderImplMixin",
     "ext.ModelSerializerMixin",
     "ext.ChunkBlockStatesMixin",

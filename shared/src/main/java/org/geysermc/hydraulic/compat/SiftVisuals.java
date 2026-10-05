@@ -22,6 +22,17 @@ public class SiftVisuals extends PackModule<SiftVisuals> {
             if (!context.mod().namespace().equals("the_sift")) return;
             try {
                 var pack = context.bedrockResourcePack();
+                pack.addExtraFile(SonorousBeamPresentation.geometry(), "models/entity/sonorous_beam.geo.json");
+                pack.addExtraFile(SonorousBeamPresentation.entity(), "entity/sonorous_beam.entity.json");
+                pack.addExtraFile(SonorousBeamPresentation.animation(), "animations/sonorous_beam.animation.json");
+                pack.addExtraFile(SonorousBeamPresentation.controller(), "render_controllers/sonorous_beam.json");
+                // Tile the original beam texture in one bounded atlas; one actor, four faces.
+                java.awt.image.BufferedImage beamSource;
+                try (var input = Files.newInputStream(context.mod().resolveFile("assets/the_sift/textures/block/sonorous_deepslate_beam.png"))) { beamSource = ImageIO.read(input); }
+                var beam = new java.awt.image.BufferedImage(16,2048,java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y=0;y<2048;y++) for(int x=0;x<16;x++) beam.setRGB(x,y,beamSource.getRGB(x*beamSource.getWidth()/16,(y%32)*beamSource.getHeight()/32));
+                var beamBytes = new java.io.ByteArrayOutputStream(); ImageIO.write(beam,"png",beamBytes);
+                pack.addExtraFile(beamBytes.toByteArray(),"textures/hydraulic/the_sift/sonorous_beam.png");
                 var image = context.mod().resolveFile("assets/the_sift/textures/misc/sift_portal_shaderpack.png");
                 if (image == null) image = context.mod().resolveFile("assets/the_sift/textures/block/sift_portal_mist.png");
                 java.awt.image.BufferedImage portal;
@@ -45,19 +56,7 @@ public class SiftVisuals extends PackModule<SiftVisuals> {
                     try (var input = Files.newInputStream(textureFile)) { bitmap = ImageIO.read(input); }
                     String output = "textures/hydraulic/the_sift/particle/" + name;
                     pack.addExtraFile(Files.readAllBytes(textureFile), output + ".png");
-                    boolean wave = name.contains("sound_wave");
-                    var components = Map.of(
-                            "minecraft:emitter_rate_instant", Map.of("num_particles", 1),
-                            "minecraft:emitter_lifetime_once", Map.of("active_time", 0.01),
-                            "minecraft:emitter_shape_point", Map.of("offset", List.of(0, 0, 0), "direction", List.of(0, 1, 0)),
-                            "minecraft:particle_initial_speed", wave ? 0 : 0.15,
-                            "minecraft:particle_lifetime_expression", Map.of("max_lifetime", wave ? 0.5 : 1.2),
-                            "minecraft:particle_motion_dynamic", Map.of("linear_acceleration", List.of(0, 0.1, 0)),
-                            "minecraft:particle_appearance_billboard", Map.of("size", wave ? List.of("0.1 + variable.particle_age * 2", "0.1 + variable.particle_age * 2") : List.of(0.12, 0.12),
-                                    "facing_camera_mode", "lookat_xyz", "uv", Map.of("texture_width", bitmap.getWidth(), "texture_height", bitmap.getHeight(), "uv", List.of(0, 0), "uv_size", List.of(bitmap.getWidth(), bitmap.getHeight()))),
-                            "minecraft:particle_appearance_tinting", Map.of("color", List.of(1, 1, 1, "1 - variable.particle_age / variable.particle_lifetime")));
-                    pack.addExtraFile(GSON.toJsonTree(Map.of("format_version", "1.10.0", "particle_effect", Map.of("description", Map.of(
-                            "identifier", identifier, "basic_render_parameters", Map.of("material", "particles_blend", "texture", output)), "components", components))), "particles/" + name + ".json");
+                    pack.addExtraFile(SiftParticlePresentation.create(identifier, output, bitmap.getWidth(), bitmap.getHeight()), "particles/" + name + ".json");
                 }
             } catch (Exception e) { throw new IllegalStateException("Could not convert Sift portal/effects", e); }
         });

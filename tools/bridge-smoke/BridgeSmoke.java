@@ -96,6 +96,58 @@ public class BridgeSmoke implements ModInitializer {
                     if (!decodedVoxel.equals(voxelPacket) || voxelBuffer.isReadable()) throw new AssertionError("Voxel registry wire mismatch");
                 } finally { voxelBuffer.release(); }
                 System.out.println("HYDRAULIC VOXEL REGISTRY SMOKE PASS: login mixin supplies both built-ins; protocol 2193 wire round trip passed.");
+                var nativeSpear = BuiltInRegistries.ITEM.getValue(net.minecraft.resources.Identifier.parse("the_sift:siftite_spear"));
+                var nativeRange=nativeSpear.components().get(net.minecraft.core.component.DataComponents.ATTACK_RANGE);
+                var nativeKinetic=nativeSpear.components().get(net.minecraft.core.component.DataComponents.KINETIC_WEAPON);
+                int spearId=BuiltInRegistries.ITEM.getId(nativeSpear);
+                var spearMapping=org.geysermc.geyser.registry.Registries.ITEMS.get().values().iterator().next().getMapping(spearId);
+                var baseField=org.geysermc.geyser.item.type.Item.class.getDeclaredField("baseComponents");baseField.setAccessible(true);
+                var spearComponents=(org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponents)baseField.get(spearMapping.getJavaItem());
+                var bedrockRange=spearComponents.get(org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentTypes.ATTACK_RANGE);
+                var bedrockKinetic=spearComponents.get(org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentTypes.KINETIC_WEAPON);
+                if(bedrockRange==null || bedrockRange.maxReach()!=nativeRange.maxReach() || bedrockRange.minReach()!=nativeRange.minReach()
+                        || bedrockKinetic==null || bedrockKinetic.delayTicks()!=nativeKinetic.delayTicks()
+                        || spearComponents.get(org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentTypes.PIERCING_WEAPON)==null) throw new AssertionError("Native spear combat components missing");
+                var bucket=BuiltInRegistries.ITEM.getValue(net.minecraft.resources.Identifier.parse("the_sift:ichor_bucket"));
+                for(var items:org.geysermc.geyser.registry.Registries.ITEMS.get().values()) {
+                    if(!items.getBuckets().contains(items.getMapping(BuiltInRegistries.ITEM.getId(bucket)).getClass().getMethod("getBedrockDefinition").invoke(items.getMapping(BuiltInRegistries.ITEM.getId(bucket)))))throw new AssertionError("Ichor bucket omitted from native-use path");
+                }
+                if(org.geysermc.hydraulic.block.IchorFluidLayer.LEVELS.size()!=16)throw new AssertionError("Incomplete Ichor fluid states");
+                for(var entry:org.geysermc.hydraulic.block.IchorFluidLayer.LEVELS.entrySet()) {
+                    if(org.geysermc.hydraulic.block.JavaBlockStateRemapper.translate(entry.getKey())!=entry.getKey())throw new AssertionError("Ichor visual still maps to vanilla water");
+                    for(var blocks:org.geysermc.geyser.registry.BlockRegistries.BLOCKS.get().values()) {
+                        Object water=org.geysermc.hydraulic.block.IchorFluidLayer.class.getMethod("fluid", org.geysermc.geyser.registry.type.BlockMappings.class,int.class).invoke(null,blocks,entry.getKey());
+                        var state=(org.cloudburstmc.nbt.NbtMap)water.getClass().getMethod("getState").invoke(water);
+                        if(!java.util.Set.of("minecraft:water","minecraft:flowing_water").contains(state.getString("name")) || state.getCompound("states").getInt("liquid_depth")!=entry.getValue())throw new AssertionError("Incorrect Ichor fluid layer: "+state);
+                    }
+                }
+                Object definitions=org.geysermc.geyser.registry.Registries.BIOMES.get();
+                Map<?,?> definitionMap=(Map<?,?>)definitions.getClass().getMethod("getDefinitions").invoke(definitions);
+                if(org.geysermc.hydraulic.compat.SiftBiomes.IDS.size()!=10)throw new AssertionError("Missing Sift biome definitions");
+                for(var entry:org.geysermc.hydraulic.compat.SiftBiomes.IDS.entrySet()) {
+                    if(!definitionMap.containsKey(entry.getKey()) || !definitionMap.get(entry.getKey()).getClass().getMethod("getId").invoke(definitionMap.get(entry.getKey())).equals(entry.getValue()))throw new AssertionError("Sift biome ID mismatch");
+                }
+                Object biomePacket=Class.forName(protocolPrefix+"packet.BiomeDefinitionListPacket").getConstructor().newInstance();
+                biomePacket.getClass().getMethod("setBiomes",definitions.getClass()).invoke(biomePacket,definitions);
+                var biomeBuffer=Unpooled.buffer();
+                try {
+                    var helper=voxelCodec.getClass().getMethod("createHelper").invoke(voxelCodec);
+                    voxelCodec.getClass().getMethod("tryEncode",helperClass,io.netty.buffer.ByteBuf.class,packetClass).invoke(voxelCodec,helper,biomeBuffer,biomePacket);
+                    var definition=voxelCodec.getClass().getMethod("getPacketDefinition",Class.class).invoke(voxelCodec,biomePacket.getClass());
+                    int packetId=(int)definition.getClass().getMethod("getId").invoke(definition);
+                    var decoded=voxelCodec.getClass().getMethod("tryDecode",helperClass,io.netty.buffer.ByteBuf.class,int.class).invoke(voxelCodec,helper,biomeBuffer,packetId);
+                    Object decodedDefinitions=decoded.getClass().getMethod("getBiomes").invoke(decoded);
+                    var decodedMap=(Map<?,?>)decodedDefinitions.getClass().getMethod("getDefinitions").invoke(decodedDefinitions);
+                    for(var entry:org.geysermc.hydraulic.compat.SiftBiomes.IDS.entrySet()) {
+                        Object value=decodedMap.get(entry.getKey());if(value==null || !value.getClass().getMethod("getId").invoke(value).equals(entry.getValue()))throw new AssertionError("Sift biome wire mismatch");
+                    }
+                    if(biomeBuffer.isReadable())throw new AssertionError("Unread biome bytes");
+                } finally {biomeBuffer.release();}
+                var beamBlock=BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.parse("the_sift:sonorous_deepslate"));
+                var nativeBeam=((net.minecraft.world.level.block.EntityBlock)beamBlock).newBlockEntity(net.minecraft.core.BlockPos.ZERO,beamBlock.defaultBlockState());
+                nativeBeam.getClass().getMethod("startBeam",int.class).invoke(nativeBeam,0x33ccff);
+                if(!(boolean)nativeBeam.getClass().getMethod("hasBeam").invoke(nativeBeam) || (int)nativeBeam.getClass().getMethod("getBeamColor").invoke(nativeBeam)!=0x33ccff)throw new AssertionError("Sonorous state reflection failed");
+                System.out.println("HYDRAULIC RESTORATION SMOKE PASS: spear components, bucket use list, 16 exact fluid layers, 10 biome IDs on protocol 2193, original Sonorous beam state.");
                 int entities = 0, appearances = 0, sounds = 0;
                 Class.forName("org.geysermc.geyser.translator.protocol.java.JavaRespawnTranslator");
                 int filteredParticles = 0;
@@ -217,7 +269,7 @@ public class BridgeSmoke implements ModInitializer {
                     }
                     var methods = choices.stream().filter(java.util.Objects::nonNull).flatMap(c -> c.materialInstances().values().stream())
                             .map(m -> m.renderMethod()).distinct().sorted().toList();
-                    if (!java.util.Set.of("the_sift:ichor_glass", "the_sift:ichor_glass_pane", "the_sift:ichor_cauldron").contains(block.identifier()) && methods.contains("blend")) throw new AssertionError("Unexpected blended block " + block.identifier());
+                    if (!java.util.Set.of("the_sift:ichor", "the_sift:ichor_glass", "the_sift:ichor_glass_pane", "the_sift:ichor_cauldron").contains(block.identifier()) && methods.contains("blend")) throw new AssertionError("Unexpected blended block " + block.identifier());
                     System.out.println("HYDRAULIC RENDER AUDIT " + block.identifier() + " " + methods + " presentations=" + presentations.size());
                 }
                 System.out.println("HYDRAULIC BASE PRESENTATION AUDIT PASS: all modeled defaults have geometry/material; Siftslate binds all six opaque faces to its texture.");
@@ -229,7 +281,7 @@ public class BridgeSmoke implements ModInitializer {
                         Map<String, String> values = new HashMap<>();
                         for (var property : state.getProperties()) values.put(property.getName(), state.getValue(property).toString().toLowerCase(java.util.Locale.ROOT));
                         long matches = block.permutations().stream().filter(p -> matchesCondition(p.condition(), values)).count();
-                        if (!resolved.containsKey(net.minecraft.commands.arguments.blocks.BlockStateParser.serialize(state))) {
+                        if (!block.identifier().equals("the_sift:ichor") && !resolved.containsKey(net.minecraft.commands.arguments.blocks.BlockStateParser.serialize(state))) {
                             if (matches != 0) throw new AssertionError("Previously absent model gained a permutation: " + state);
                             continue;
                         }

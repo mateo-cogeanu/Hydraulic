@@ -36,6 +36,7 @@ import java.util.*;
 
 @AutoService(PackModule.class)
 public class ItemPackModule extends TexturePackModule<ItemPackModule> {
+    public static final Set<Integer> BUCKET_ITEM_IDS = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<Key, ItemModel> itemModels = new HashMap<>();
     private final Set<Identifier> itemsWith2dIcon = new LinkedHashSet<>();
     private final Set<Identifier> handheldItems = new LinkedHashSet<>();
@@ -234,6 +235,7 @@ public class ItemPackModule extends TexturePackModule<ItemPackModule> {
 
                 customItemDefinition.bedrockOptions(customItemOptions);
 
+                if (item instanceof BucketItem) BUCKET_ITEM_IDS.add(registry.getId(item));
                 event.register(customItemDefinition.build());
             } catch (Exception e) {
                 context.logger().error("Unable to register {}:", itemLocation, e);

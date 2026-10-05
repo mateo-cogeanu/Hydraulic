@@ -39,8 +39,8 @@ The pack audit checks JSON validity, item/armor/entity/particle texture paths, g
 ## Work remaining before full support
 
 - Complete special mob animations, glow layers, variant/taming textures, native Siftite Return rendering, boat rowing/seat alignment and interaction testing. Basic spawn/render bridges do not prove every entity behavior.
-- Translate Ichor's custom appearance and full fluid behavior. Its 16 states currently use corresponding vanilla water states because it has no standard blockstate JSON. Ichor logging on vanilla blocks is not represented faithfully.
-- Improve portal animation/parallax beyond the static Bedrock surface.
+- Validate the new Ichor visual/fluid-layer and bucket-use bridges on Bedrock. Ichor logging on vanilla blocks and exact neighbor-dependent fluid surface meshing remain limitations.
+- Match camera-dependent portal shader parallax beyond the current animated texture approximation.
 - Adapt client-only dimension sky, weather, shaders, particles, custom networking and entity animation state. Java client code does not execute on Bedrock.
 - Validate progression, portal activation, dimension travel, mob interaction, crafting/smithing, equipment, inventories and audio with an actual Bedrock client.
 
@@ -204,7 +204,7 @@ Minecraft 26.3 hanging-sign templates contain multi-axis element rotations, incl
 
 The absence of the shape entries is verified on the server; resolution of the client warning, boat/sign appearance and phone memory crash remains a client retest. This patch does not claim a verified crash fix. The supplied command keyword warnings and panda asset error remain unaddressed: the generated Sift pack contains no panda entity file, and blindly changing Java command casing could change their meaning.
 
-## Current preview: original portal cloud field (2026-10-05)
+## Earlier preview: original portal cloud field (2026-10-05)
 
 The user reports that the preceding registry/culling repair fixes the lag and asks for a portal appearance as close to the original as possible. The earlier procedural substitute used a dark-blue palette and artificial stars; The Sift's `assets/the_sift/shaders/include/portal_fields.glsl` instead produces layered white/turquoise mist.
 
@@ -213,3 +213,24 @@ The portal atlas now bakes that shader's five-octave noise, domain warp, far/mid
 Frames increase to 64×64 pixels for cloud detail while remaining at sixteen frames and three ticks per frame. The opaque 64×1024 atlas is bounded to 256 KiB of decoded RGBA; generating the noise occurs once during pack conversion, not on the phone or per server tick. Block geometry, unit-cube shape, culling, light emission, native states, entities, animations, sounds, particle budgets and view-distance rules remain unchanged. All prior lag and visibility repairs are retained.
 
 70 regression tests pass, including independent original-shader reference values, matching opposite tile edges and preservation of the original white/turquoise palette. Pack and fresh/cached bridge audits retain the voxel login hook/wire roundtrip and native state/chunk checks. Replace only Hydraulic, restart and accept the regenerated pack. The portal appearance still requires the user's Bedrock review; no additional measured frame-rate claim is made.
+
+
+## Current preview: Sift effects and interaction bridges (2026-10-05)
+
+This build retains the voxel built-ins, explicit terrain geometry, shared block presentations, conservative face culling and Sift-only four-chunk request cap that the user confirmed fixed the lag. The original Sift, Geyser, Floodgate, GeckoLib and Fabric API JARs remain unchanged.
+
+Hydraulic now converts the native attack-range, kinetic-weapon, piercing-weapon, use-effects and attack-animation components. Siftite spear reach, jab/charge affordances, charge delay and movement modifier reach Geyser's native Bedrock item converter. The Java server remains responsible for damage, knockback and dismount rules. Geyser's public kinetic API exposes only delay/dismount conditions; this does not reproduce every first-person spear animation or expose all Java weapon conditions to the Bedrock client.
+
+Custom BucketItem definitions are included in Geyser's bucket-use list. A block tap can now send the original use-item/raycast packet and invoke IchorBucketItem.use, rather than only sending use-on-block. Placement, pickup, permissions, Ichor logging and inventory replacement continue to run in the original server code. Interaction and survival inventory consumption still need a real Bedrock test.
+
+Ichor has an explicit, noncollidable custom presentation for all 16 native levels. It uses the existing original still/flow animations at the retained 32-pixel frame size, without duplicating their atlases. A water fluid layer preserves swimming; its liquid depth is matched to the native level in chunks and subsequent updates. The visual surface sits slightly above that layer to avoid coplanar flicker. No global Overworld water texture is changed. This is a hybrid Bedrock presentation, not a port of Java's fluid renderer: stacked/neighbor-dependent slopes and Ichor logging on vanilla blocks remain approximate.
+
+A nearby ticker restores original biome ambient particles, surface mist and portal fragments for Bedrock players in the Sift. It samples the original AMBIENT_PARTICLES attribute, keeps the original pastel note palette and finite fade-in/fade-out, and does not generate chunks to collect effects. Extra ambient emitters are capped at four per four ticks; at most two nearby Singer appear/disappear emitters are sent per pass. The existing 32-per-second native effect budget and 24-block native particle radius remain. Overworld native effects remain available. Count-zero sound-wave packets retain their source position and encoded direction/lifetime, instead of incorrectly treating their velocity data as Gaussian position spread.
+
+Sonorous note-block pillars read the original block entity's beam color, growth and shrink state. Each visible pillar uses one narrow four-faced actor (0.3 blocks wide, 128 blocks tall), with the original tiled beam texture, full-bright rendering, smooth growth and scrolling UVs. Native portal/concert timing remains untouched. Up to 16 nearest pillars are shown within 48 blocks; departed/inactive pillars are removed and dimension/disconnect state is cleared. This culls distant pillars without changing server structures or the music sequence. The underwater beam material split of the Java renderer is not reproduced.
+
+Singer rendering adds the original singer_glowmask.png as a separate full-bright transparent pass. The body keeps ordinary lighting; no artificial light blocks are placed. The original appear/sing/disappear and soul-event states are also synchronized by the ticker, including portal summoning in the Overworld. This strengthens the existing native spawn/event bridge; it does not create a second Singer or replace the summoning logic.
+
+Ten original Sift biomes receive dedicated Bedrock IDs and matching client-biome resources. Climate/precipitation come from the original biome definitions. Sky color uses the original procedural renderer's daytime zenith, with scoped fog/water colors, while vanilla biome definitions remain intact. Bedrock's documented [client biome colors](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/clientbiomesreference/examples/components/minecraftclientbiomes_sky_color?view=minecraft-bedrock-stable) and [render-controller lighting](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/visualreference/render_controller.v1.8.0?view=minecraft-bedrock-stable) support these settings. The animated multicolored Java sky dome and its custom day/night ribbon movement are not reproduced by this classic Bedrock sky-color setting.
+
+Validation: 73 regression tests pass. The unshipped Fabric probe checks the actual registered spear components, custom bucket-use list, all 16 fluid layers across Bedrock palettes, native Sonorous beam state, ten custom biome IDs and a protocol-2193 biome packet round trip. Existing chunk/visible-state, voxel-registry, entity/audio and native Singer sequence checks remain required. The generated pack audit checks all new assets and references. These are server/pack checks; new visual fidelity, bucket/spear interaction, portal summoning and sustained iPhone performance still require the user's client test.

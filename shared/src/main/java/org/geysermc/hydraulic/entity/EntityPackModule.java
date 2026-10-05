@@ -55,6 +55,9 @@ public class EntityPackModule extends PackModule<EntityPackModule> {
             }
         });
         listenOn(GeyserDefineEntitiesEvent.class, context -> {
+            if (context.mod().namespace().equals("the_sift")) context.event().register(CustomEntityDefinition.of(
+                    org.geysermc.hydraulic.compat.SonorousBeamPresentation.IDENTIFIER));
+
             if (!HydraulicImpl.instance().getConfig().customEntityAppearances()) {
                 if (PROFILES.values().stream().anyMatch(profile -> profile.identifier().startsWith(context.mod().namespace() + ":"))) {
                     context.logger().warn("Hydraulic entity isolation: {} mobs use vanilla proxy appearances; custom definitions, models and animations are omitted", context.mod().id());
@@ -101,6 +104,7 @@ public class EntityPackModule extends PackModule<EntityPackModule> {
     public void onDisconnect(SessionDisconnectEvent event) {
         UUID uuid = event.connection().javaUuid();
         if (uuid != null) {
+            org.geysermc.hydraulic.compat.SiftClientEffects.disconnect(uuid);
             TRACKED.remove(uuid);
             org.geysermc.hydraulic.compat.NativePacketBridge.ENTITY_UPDATES.remove(uuid);
             SiftAnimationBridge.STATES.remove(uuid);
@@ -136,6 +140,18 @@ public class EntityPackModule extends PackModule<EntityPackModule> {
                 JsonObject description = GSON.toJsonTree(Map.of("identifier", profile.identifier(),
                         "materials", Map.of("default", "entity_alphatest"), "textures", Map.of("default", texture),
                         "geometry", Map.of("default", geometry), "render_controllers", List.of("controller.render.hydraulic.entity"))).getAsJsonObject();
+                if (name.equals("singer") && context.mod().namespace().equals("the_sift")) {
+                    String glow = "textures/hydraulic/the_sift/entity/singer_glowmask";
+                    Path mask = context.mod().resolveFile("assets/the_sift/textures/entity/singer_glowmask.png");
+                    context.bedrockResourcePack().addExtraFile(Files.readAllBytes(mask), glow + ".png");
+                    description.getAsJsonObject("materials").addProperty("glow", "entity_alphatest");
+                    description.getAsJsonObject("textures").addProperty("glow", glow);
+                    description.getAsJsonArray("render_controllers").add("controller.render.hydraulic.singer_glow");
+                    context.bedrockResourcePack().addExtraFile(GSON.toJsonTree(Map.of("format_version", "1.8.0", "render_controllers", Map.of(
+                            "controller.render.hydraulic.singer_glow", Map.of("geometry", "Geometry.default", "ignore_lighting", true,
+                                    "materials", List.of(Map.of("*", "Material.glow")), "textures", List.of("Texture.glow"))))),
+                            "render_controllers/hydraulic_singer_glow.json");
+                }
                 if (animations != null) {
                     JsonObject available = animations.getAsJsonObject("animations");
                     Map<String, String> names = new LinkedHashMap<>();

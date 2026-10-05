@@ -283,6 +283,7 @@ public class BlockPackModule extends PackModule<BlockPackModule> {
         DefaultedRegistry<Block> registry = BuiltInRegistries.BLOCK;
         for (Block block : blocks) {
             Identifier blockLocation = registry.getKey(block);
+            if (blockLocation.toString().equals("the_sift:ichor")) continue; // Fluid presentation has no Java block model.
             CustomBlockData.Builder builder = NonVanillaCustomBlockData.builder()
                     .name(blockLocation.getPath())
                     .namespace(blockLocation.getNamespace())

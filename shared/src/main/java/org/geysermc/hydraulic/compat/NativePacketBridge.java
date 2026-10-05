@@ -66,6 +66,8 @@ public final class NativePacketBridge {
             var animations = org.geysermc.hydraulic.entity.SiftAnimationBridge.STATES.get(owner);
             if (animations != null) remove.entityIds().forEach((int id) -> animations.remove(id));
         }
+        if (packet instanceof ClientboundBlockEntityDataPacket blockEntity &&
+                "the_sift:sonorous_deepslate".equals(BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType()).toString())) return null;
         if (packet instanceof ClientboundSoundPacket sound && !sound.getSound().value().location().getNamespace().equals("minecraft")) {
             // Direct holders encode the sound identifier, not an unrecognised mod registry index.
             return new ClientboundSoundPacket(Holder.direct(sound.getSound().value()), sound.getSource(), sound.getX(), sound.getY(), sound.getZ(), sound.getVolume(), sound.getPitch(), sound.getSeed());
@@ -91,9 +93,17 @@ public final class NativePacketBridge {
                             PARTICLE_BUDGETS.computeIfAbsent(owner, ignored -> new ParticleBudget()), System.nanoTime());
                     var random = java.util.concurrent.ThreadLocalRandom.current();
                     for (int i = 0; i < count; i++) {
-                        var position = Vector3f.from(particles.x() + random.nextGaussian() * particles.xDist(),
-                                particles.y() + random.nextGaussian() * particles.yDist(), particles.z() + random.nextGaussian() * particles.zDist());
-                        particle(session, identifier, position);
+                        var position = Vector3f.from(particles.x() + (particles.count() == 0 ? 0 : random.nextGaussian() * particles.xDist()),
+                                particles.y() + (particles.count() == 0 ? 0 : random.nextGaussian() * particles.yDist()), particles.z() + (particles.count() == 0 ? 0 : random.nextGaussian() * particles.zDist()));
+                        Map<String,Double> variables = Map.of();
+                        if (particles.count() == 0 && identifier.contains("sound_wave")) {
+                            double magnitude = Math.sqrt(particles.xDist()*particles.xDist()+particles.yDist()*particles.yDist()+particles.zDist()*particles.zDist());
+                            double length = Math.max(0.000001,magnitude);
+                            double life = Math.clamp(Math.round((magnitude-1)*100)/20.0,0.05,10);
+                            variables = Map.of("dx",particles.xDist()/length,"dy",particles.yDist()/length,"dz",particles.zDist()/length,
+                                    "life",life,"speed",identifier.equals("the_sift:singer_sound_wave")?12d:30d);
+                        }
+                        particle(session, identifier, position, variables);
                     }
                 }
                 return null;
@@ -116,7 +126,10 @@ public final class NativePacketBridge {
         return packet;
     }
 
-    private static void particle(GeyserSession session, String identifier, Vector3f position) {
+    public static void particle(GeyserSession session, String identifier, Vector3f position) {
+        particle(session,identifier,position,Map.of());
+    }
+    public static void particle(GeyserSession session, String identifier, Vector3f position, Map<String,Double> variables) {
         if (session == null || session.isClosed()) return;
         session.executeInEventLoop(() -> {
             if (session.isClosed()) return;
@@ -124,6 +137,9 @@ public final class NativePacketBridge {
             effect.setIdentifier(identifier);
             effect.setDimensionId(DimensionUtils.javaToBedrock(session));
             effect.setPosition(position);
+            if (!variables.isEmpty()) effect.setMolangVariablesJson(Optional.of(new com.google.gson.Gson().toJson(
+                    variables.entrySet().stream().map(entry -> Map.of("name", "variable."+entry.getKey(), "value",
+                            Map.of("type", "float", "value", entry.getValue()))).toList())));
             session.sendUpstreamPacket(effect);
         });
     }

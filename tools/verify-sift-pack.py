@@ -140,7 +140,7 @@ with ZipFile(sys.argv[1]) as pack:
     assert 'hydraulic_sift_portal' in terrain
     assert 'textures/hydraulic/the_sift/portal.png' in names
     entities = [name for name in names if name.startswith('entity/') and name.endswith('.json')]
-    assert len(entities) == 9, f'Expected 9 entity appearances, found {len(entities)}'
+    assert len(entities) == 10, f'Expected 10 entity appearances, found {len(entities)}'
     animations = {}
     for name in names:
         if name.startswith('animations/') and name.endswith('.json'):
@@ -162,6 +162,32 @@ with ZipFile(sys.argv[1]) as pack:
     for name in particles:
         description = json.loads(pack.read(name))['particle_effect']['description']
         assert description['basic_render_parameters']['texture'] + '.png' in names, name
+        components = json.loads(pack.read(name))['particle_effect']['components']
+        assert components['minecraft:emitter_rate_instant']['num_particles'] == 1, name
+        assert components['minecraft:emitter_lifetime_once']['active_time'] <= 0.01, name
+        assert 'minecraft:particle_lifetime_expression' in components, name
+    biomes = [name for name in names if name.startswith('biomes/') and name.endswith('.json')]
+    assert len(biomes) == 10, 'Expected ten dedicated Sift biome appearances'
+    fogs = {json.loads(pack.read(name))['minecraft:fog_settings']['description']['identifier']
+            for name in names if name.startswith('fogs/') and name.endswith('.json')}
+    for name in biomes:
+        biome = json.loads(pack.read(name))['minecraft:client_biome']
+        assert biome['description']['identifier'].startswith('the_sift:'), name
+        assert biome['components']['minecraft:fog_appearance']['fog_identifier'] in fogs, name
+        assert biome['components']['minecraft:sky_color']['sky_color'] == '#6edeee', name
+    singer = json.loads(pack.read('entity/singer.entity.json'))['minecraft:client_entity']['description']
+    assert singer['textures']['glow'] + '.png' in names
+    glow = json.loads(pack.read('render_controllers/hydraulic_singer_glow.json'))['render_controllers']['controller.render.hydraulic.singer_glow']
+    assert glow['ignore_lighting'] is True
+    assert glow['textures'] == ['Texture.glow']
+    beam = geometries['geometry.hydraulic.sonorous_beam']
+    assert len(beam['bones']) == 1 and len(beam['bones'][0]['cubes']) == 1
+    for level in range(16):
+        geometry = geometries[f'geometry.hydraulic.ichor_{level}']
+        cube = geometry['bones'][0]['cubes'][0]
+        assert 0 < cube['size'][1] < 16, f'Ichor depth {level}'
+        assert set(cube['uv']) == {'up', 'down', 'north', 'south', 'east', 'west'}
+    print('PASS: ten scoped biome appearances, Singer glow mask, one-cube Sonorous beam, sixteen Ichor depths, finite effect emitters')
     print(f'PASS: portal geometry/texture, {len(entities)} entity appearances, {len(animations)} animations, {len(particles)} effects')
     print(f'PASS: {len(icons)} item icons, {len(attachables)} armor attachables, '
           f'{len(multipart)} shared multipart geometries, {len(sounds)} sound events')
