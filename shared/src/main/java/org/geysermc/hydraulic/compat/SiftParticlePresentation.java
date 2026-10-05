@@ -27,7 +27,7 @@ public final class SiftParticlePresentation {
                 "facing_camera_mode",mist?"direction_z":"lookat_xyz","uv",uv));
         if(mist) {
             @SuppressWarnings("unchecked") var billboard = new LinkedHashMap<>((Map<String,Object>)components.get("minecraft:particle_appearance_billboard"));
-            billboard.put("direction",Map.of("mode","custom_direction","custom_direction",List.of(0,1,0)));
+            billboard.put("direction",Map.of("mode","custom","custom_direction",List.of(0,1,0)));
             components.put("minecraft:particle_appearance_billboard",billboard);
         }
         String alpha=mist?"math.sin(180 * variable.particle_age / variable.particle_lifetime) * 0.55":note?"math.min(1, variable.particle_age / 0.7) * math.min(1, (variable.particle_lifetime-variable.particle_age) / 1.2) * 0.85":"1 - variable.particle_age / variable.particle_lifetime";

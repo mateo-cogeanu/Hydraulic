@@ -239,3 +239,12 @@ Validation: 73 regression tests pass. The unshipped Fabric probe checks the actu
 ### Ichor chunk palette correction (2026-10-05)
 
 The user's new log exposed an UnsupportedOperationException in IchorFluidLayer.apply: Geyser constructs second-layer water storage using immutable singleton or two-entry palettes. Adding a non-source Ichor fluid depth directly to that storage discarded the chunk translation. Hydraulic now copies the second layer lazily before its first changed depth, preserving the original storage and every non-Ichor cell. Sections that already have the correct depths are left intact. The runtime probe applies all sixteen depths against both immutable palette layouts across every supported Bedrock palette; this exercises the actual chunk adjustment, beyond the previous mapping-only checks.
+
+
+### Client particle and recipe validation corrections (2026-10-05)
+
+The iPhone content log rejects `custom_direction` as the billboard direction mode. The older Microsoft documentation lists that spelling, but Mojang's current [shriek particle](https://github.com/Mojang/bedrock-samples/blob/main/resource_pack/particles/shriek.json) uses `custom`, with the vector still named `custom_direction`. The Ichor mist now uses that shipped representation while retaining its flat surface orientation and finite lifetime.
+
+The recipe collisions come from Geyser's lazy initialization of four cartography recipes after its session recipe counter has been constructed. Hydraulic's session-constructor hook initializes those built-ins and raises the next dynamic ID above reserved IDs before trim/stonecutter recipes are allocated. It does not change Java recipe identifiers or outputs. The runtime probe exercises the injected hook, checks all four reserved map IDs, and ensures repeated reservation never rewinds the counter. This correction remains inside Hydraulic. The separate camel-case command and vanilla panda resource warnings are not changed by this patch; the provided server log does not establish them as a disconnect cause.
+
+75 regression tests, generated-pack audits and fresh/cached runtime checks are required for this revision. Client acceptance and remaining disconnect diagnosis still need a new Bedrock test.

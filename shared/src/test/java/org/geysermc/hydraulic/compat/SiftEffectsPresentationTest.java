@@ -6,6 +6,25 @@ import org.geysermc.hydraulic.block.GeometryCulling;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SiftEffectsPresentationTest {
+    @Test void mistUsesTheDirectionModeInMojangsShriekParticle() {
+        var components=SiftParticlePresentation.create("the_sift:ichor_surface_mist","mist",16,16)
+                .getAsJsonObject("particle_effect").getAsJsonObject("components");
+        var billboard=components.getAsJsonObject("minecraft:particle_appearance_billboard");
+        assertEquals("direction_z",billboard.get("facing_camera_mode").getAsString());
+        var direction=billboard.getAsJsonObject("direction");
+        assertEquals("custom",direction.get("mode").getAsString());
+        assertEquals(1,direction.getAsJsonArray("custom_direction").get(1).getAsInt());
+    }
+    @Test void recipeReservationSkipsBuiltinsWithoutReusingAlreadyAllocatedIds() {
+        var next=new java.util.concurrent.atomic.AtomicInteger(1);
+        RecipeNetworkIds.reserve(next,4);
+        assertEquals(5,next.getAndIncrement());
+        RecipeNetworkIds.reserve(next,4);
+        assertEquals(6,next.getAndIncrement());
+        RecipeNetworkIds.reserve(next,10);
+        assertEquals(11,next.getAndIncrement());
+    }
+
     @Test void flowingIchorRetainsNativeLevelsAndNeverCullsItsExposedSurface() {
         assertEquals(8/9f,IchorPresentation.height(0));
         assertEquals(1/9f,IchorPresentation.height(7));

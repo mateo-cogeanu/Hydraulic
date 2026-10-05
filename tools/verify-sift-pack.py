@@ -166,6 +166,10 @@ with ZipFile(sys.argv[1]) as pack:
         assert components['minecraft:emitter_rate_instant']['num_particles'] == 1, name
         assert components['minecraft:emitter_lifetime_once']['active_time'] <= 0.01, name
         assert 'minecraft:particle_lifetime_expression' in components, name
+        if name.endswith('/ichor_surface_mist.json'):
+            billboard = components['minecraft:particle_appearance_billboard']
+            assert billboard['direction']['mode'] == 'custom', 'Client rejects custom_direction as a mode'
+            assert billboard['direction']['custom_direction'] == [0, 1, 0]
     biomes = [name for name in names if name.startswith('biomes/') and name.endswith('.json')]
     assert len(biomes) == 10, 'Expected ten dedicated Sift biome appearances'
     fogs = {json.loads(pack.read(name))['minecraft:fog_settings']['description']['identifier']

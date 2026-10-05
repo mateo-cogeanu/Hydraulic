@@ -44,6 +44,23 @@ public class BridgeSmoke implements ModInitializer {
                 var unsafe = (sun.misc.Unsafe) unsafeField.get(null);
                 var sessionClass = org.geysermc.geyser.session.GeyserSession.class;
                 var sessionFixture = unsafe.allocateInstance(sessionClass);
+                var recipeField = sessionClass.getDeclaredField("lastRecipeNetId");
+                recipeField.setAccessible(true);
+                var recipeCounter = new java.util.concurrent.atomic.AtomicInteger(org.geysermc.geyser.util.InventoryUtils.LAST_RECIPE_NET_ID + 1);
+                recipeField.set(sessionFixture, recipeCounter);
+                var reservationHook = java.util.Arrays.stream(sessionClass.getDeclaredMethods())
+                        .filter(method -> method.getName().contains("hydraulic$reserveMapRecipeIds")).findFirst().orElseThrow();
+                reservationHook.setAccessible(true);
+                reservationHook.invoke(sessionFixture, new Object[]{null});
+                java.util.Set<Integer> mapRecipeIds = new java.util.HashSet<>();
+                for(Object recipe : org.geysermc.geyser.inventory.recipe.RecipeUtil.CARTOGRAPHY_RECIPES) {
+                    mapRecipeIds.add((int)recipe.getClass().getMethod("getNetId").invoke(recipe));
+                }
+                int firstDynamic = recipeCounter.getAndIncrement();
+                if(mapRecipeIds.size()!=4 || firstDynamic<=java.util.Collections.max(mapRecipeIds))throw new AssertionError("Map recipe IDs collide with first dynamic recipe");
+                reservationHook.invoke(sessionFixture, new Object[]{null});
+                if(recipeCounter.get()!=firstDynamic+1)throw new AssertionError("Recipe IDs rewound after allocation");
+                System.out.println("HYDRAULIC RECIPE IDS SMOKE PASS: live constructor hook reserves four map IDs before dynamic recipes and never rewinds allocated IDs.");
                 var clientField = sessionClass.getDeclaredField("clientData");
                 var viewField = sessionClass.getDeclaredField("clientRenderDistance");
                 var serverViewField = sessionClass.getDeclaredField("serverRenderDistance");
