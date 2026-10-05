@@ -259,3 +259,7 @@ A concrete login mismatch was found: ten custom Sift biome definitions and IDs w
 Hydraulic also logs one bounded disconnect snapshot even before five seconds: login experiments, custom-biome count, pending decode errors/chunk bytes and the latest 24 translated Bedrock packet summaries. Only packet kinds and small structural counts/lengths are retained, never full packets, item contents, credentials or payload buffers. The native vanilla command/panda content warnings are unchanged.
 
 76 regression tests pass. Fresh/cached live checks verify the injected experiment and short-disconnect hooks alongside all previous mapping and pack audits. Join acceptance on the user's iPhone still needs retesting; no confirmed client fix is claimed.
+
+### Bedrock custom biome range correction (2026-10-05)
+
+The latest user disconnect diagnostic confirms protocol 2193, ten biome definitions, the enabled custom-biome experiment and zero decode errors, followed by a two-second disconnect. Geyser [issue 6673](https://github.com/GeyserMC/Geyser/issues/6673) reports the same failure and links working [custom biome implementation 6658](https://github.com/GeyserMC/Geyser/pull/6658). Hydraulic now uses its reserved custom biome ID range starting at 30000, instead of 256, and omits optional client world-generation data for proxied biomes. All ten scoped visual definitions and effects remain. The runtime probe checks the reserved signed-short range, absence of worldgen payload and protocol round trip. Actual client acceptance remains pending.

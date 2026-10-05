@@ -187,6 +187,8 @@ public class BridgeSmoke implements ModInitializer {
                 Map<?,?> definitionMap=(Map<?,?>)definitions.getClass().getMethod("getDefinitions").invoke(definitions);
                 if(org.geysermc.hydraulic.compat.SiftBiomes.IDS.size()!=10)throw new AssertionError("Missing Sift biome definitions");
                 for(var entry:org.geysermc.hydraulic.compat.SiftBiomes.IDS.entrySet()) {
+                    if(entry.getValue()<30000 || entry.getValue()>32767)throw new AssertionError("Custom biome outside Bedrock reserved range");
+                    if(definitionMap.get(entry.getKey()).getClass().getMethod("getChunkGenData").invoke(definitionMap.get(entry.getKey()))!=null)throw new AssertionError("Client worldgen payload present for proxied biome");
                     if(!definitionMap.containsKey(entry.getKey()) || !definitionMap.get(entry.getKey()).getClass().getMethod("getId").invoke(definitionMap.get(entry.getKey())).equals(entry.getValue()))throw new AssertionError("Sift biome ID mismatch");
                 }
                 Object biomePacket=Class.forName(protocolPrefix+"packet.BiomeDefinitionListPacket").getConstructor().newInstance();
@@ -201,6 +203,7 @@ public class BridgeSmoke implements ModInitializer {
                     Object decodedDefinitions=decoded.getClass().getMethod("getBiomes").invoke(decoded);
                     var decodedMap=(Map<?,?>)decodedDefinitions.getClass().getMethod("getDefinitions").invoke(decodedDefinitions);
                     for(var entry:org.geysermc.hydraulic.compat.SiftBiomes.IDS.entrySet()) {
+                    if(entry.getValue()<30000 || entry.getValue()>32767)throw new AssertionError("Custom biome outside Bedrock reserved range");
                         Object value=decodedMap.get(entry.getKey());if(value==null || !value.getClass().getMethod("getId").invoke(value).equals(entry.getValue()))throw new AssertionError("Sift biome wire mismatch");
                     }
                     if(biomeBuffer.isReadable())throw new AssertionError("Unread biome bytes");

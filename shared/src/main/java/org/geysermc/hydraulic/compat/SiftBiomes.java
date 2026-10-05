@@ -15,6 +15,8 @@ import org.geysermc.hydraulic.pack.PackModule;
 @AutoService(PackModule.class)
 public class SiftBiomes extends PackModule<SiftBiomes> {
     private static final Gson GSON = new Gson();
+    // Bedrock reserves the signed-short range starting at 30000 for custom biomes.
+    public static final int FIRST_CUSTOM_ID = 30000;
     public static final Map<String,Integer> IDS = new LinkedHashMap<>();
     public SiftBiomes() {
         listenOn(GeyserDefineEntitiesEvent.class,context->{
@@ -22,7 +24,7 @@ public class SiftBiomes extends PackModule<SiftBiomes> {
             var registry=org.geysermc.geyser.registry.Registries.BIOME_IDENTIFIERS.get();
             var definitions=new LinkedHashMap<>(org.geysermc.geyser.registry.Registries.BIOMES.get().getDefinitions());
             var original=definitions.get("minecraft:ocean");
-            int next=Math.max(256,registry.values().intStream().max().orElse(0)+1);
+            int next=Math.max(FIRST_CUSTOM_ID,registry.values().intStream().max().orElse(0)+1);
             for(var key:HydraulicImpl.instance().server().registryAccess().lookupOrThrow(Registries.BIOME).keySet()) {
                 if(!key.getNamespace().equals("the_sift"))continue;
                 String name=key.toString();int id=registry.containsKey(name)?registry.getInt(name):next++;
@@ -30,9 +32,11 @@ public class SiftBiomes extends PackModule<SiftBiomes> {
                 JsonObject climate;
                 try { climate=JsonParser.parseString(Files.readString(context.mod().resolveFile("data/the_sift/worldgen/biome/"+key.getPath()+".json"))).getAsJsonObject(); }
                 catch(java.io.IOException e) { throw new IllegalStateException("Cannot read Sift climate",e); }
+                // Proxied worlds do not use client-side biome world generation.
+                // Leave that optional nested payload absent, as in Geyser custom biome support.
                 definitions.put(name,new BiomeDefinitionData(id,climate.get("temperature").getAsFloat(),climate.get("downfall").getAsFloat(),
                         0f,0f,0f,0f,0f,original.getDepth(),original.getScale(),original.getMapWaterColor(),climate.get("has_precipitation").getAsBoolean(),
-                        List.of("the_sift"),original.getChunkGenData()));
+                        List.of("the_sift"),null));
             }
             org.geysermc.geyser.registry.Registries.BIOMES.set(new BiomeDefinitions(definitions));
             context.logger().info("Registered {} dedicated Sift biome IDs",IDS.size());

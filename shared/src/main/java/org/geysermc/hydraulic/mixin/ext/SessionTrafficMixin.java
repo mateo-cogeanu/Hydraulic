@@ -21,4 +21,3 @@ public class SessionTrafficMixin implements SessionTrafficAccess {
         hydraulic$diagnostics.disconnect((GeyserSession)(Object)this);
     }
 }
-
